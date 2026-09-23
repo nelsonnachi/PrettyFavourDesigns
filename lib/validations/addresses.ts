@@ -5,75 +5,36 @@ import { z } from "zod";
 // ============================================================
 
 export const createAddressSchema = z.object({
-  firstName: z
-    .string()
-    .trim()
-    .min(2, "First name is required")
-    .max(100),
+  firstName: z.string().trim().min(2, "First name is required").max(100),
 
-  lastName: z
-    .string()
-    .trim()
-    .min(2, "Last name is required")
-    .max(100),
+  lastName: z.string().trim().min(2, "Last name is required").max(100),
 
-  phone: z
-    .string()
-    .trim()
-    .min(7, "Invalid phone number")
-    .max(30),
+  phone: z.string().trim().min(7, "Invalid phone number").max(30),
 
   addressLine1: z
     .string()
     .trim()
-    .min(
-      5,
-      "Address must be at least 5 characters",
-    )
+    .min(5, "Address must be at least 5 characters")
     .max(300),
 
-  addressLine2: z
-    .string()
-    .trim()
-    .max(300)
-    .optional(),
+  addressLine2: z.string().trim().max(300).optional(),
 
-  city: z
-    .string()
-    .trim()
-    .min(2, "City is required")
-    .max(100),
+  city: z.string().trim().min(2, "City is required").max(100),
 
-  state: z
-    .string()
-    .trim()
-    .min(2, "State is required")
-    .max(100),
+  state: z.string().trim().min(2, "State is required").max(100),
 
-  country: z
-    .string()
-    .trim()
-    .min(2)
-    .max(100)
-    .default("Nigeria"),
+  country: z.string().trim().min(2).max(100).default("Nigeria"),
 
-  postalCode: z
-    .string()
-    .trim()
-    .max(20)
-    .optional(),
+  postalCode: z.string().trim().max(20).optional(),
 
-  isDefault: z
-    .boolean()
-    .optional(),
-  });
+  isDefault: z.boolean().optional().default(false),
+});
 
 // ============================================================
 // UPDATE ADDRESS
 // ============================================================
 
-export const updateAddressSchema =
-  createAddressSchema.partial();
+export const updateAddressSchema = createAddressSchema.partial();
 
 // ============================================================
 // ADDRESS PARAMS

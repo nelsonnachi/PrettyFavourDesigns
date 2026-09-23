@@ -55,32 +55,57 @@ export const createAnnouncementSchema = z
 // UPDATE ANNOUNCEMENT
 // ============================================================
 
-export const updateAnnouncementSchema = z.object({
-  type: announcementTypeSchema.optional(),
+// ============================================================
+// UPDATE ANNOUNCEMENT
+// ============================================================
 
-  title: z
-    .string()
-    .trim()
-    .min(2, "Announcement title is required")
-    .max(200)
-    .optional(),
+export const updateAnnouncementSchema = z
+  .object({
+    type: announcementTypeSchema.optional(),
 
-  description: z.string().trim().max(5000).optional(),
+    title: z
+      .string()
+      .trim()
+      .min(2, "Announcement title is required")
+      .max(200)
+      .optional(),
 
-  imageUrl: z.string().url("Invalid image URL").optional(),
+    description: z.string().trim().max(5000).optional(),
 
-  imagePublicId: z.string().trim().max(500).optional(),
+    imageUrl: z.string().url("Invalid image URL").optional(),
 
-  ctaText: z.string().trim().max(100).optional(),
+    imagePublicId: z.string().trim().max(500).optional(),
 
-  ctaUrl: z.string().trim().max(500).optional(),
+    ctaText: z.string().trim().max(100).optional(),
 
-  eventAt: z.coerce.date().optional(),
+    ctaUrl: z.string().trim().max(500).optional(),
 
-  expiresAt: z.coerce.date().optional(),
+    eventAt: z.coerce.date().optional(),
 
-  isPublished: z.boolean().optional(),
-});
+    expiresAt: z.coerce.date().optional(),
+
+    isPublished: z.boolean().optional(),
+  })
+  .refine(
+    (data) => {
+      // If either date is not included in the update,
+      // we cannot compare them here.
+      //
+      // The API route will compare the new date with
+      // the existing date stored in the database.
+
+      if (!data.eventAt || !data.expiresAt) {
+        return true;
+      }
+
+      return data.expiresAt > data.eventAt;
+    },
+    {
+      message: "Expiration date must be after the event start date",
+
+      path: ["expiresAt"],
+    }
+  );
 
 // ============================================================
 // ANNOUNCEMENT PARAMS

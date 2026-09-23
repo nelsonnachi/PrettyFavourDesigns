@@ -1,33 +1,24 @@
 import { NextRequest } from "next/server";
 
-import { and, asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { addresses } from "@/db/schema";
 
 import { db } from "@/db/drizzle";
 
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 
 import { requireUser } from "@/lib/APIs/auth";
 
-import {
-  createAddressSchema,
-} from "@/lib/validations";
+import { createAddressSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
 // ============================================================
 // GET /api/addresses
 // ============================================================
-//
-// Get all addresses belonging to the logged-in user.
-//
-// ============================================================
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     // --------------------------------------------------------
     // AUTHENTICATE USER
@@ -36,49 +27,35 @@ export async function GET(req: NextRequest) {
     const user = await requireUser();
 
     // --------------------------------------------------------
-    // GET ADDRESSES
+    // GET USER ADDRESSES
     // --------------------------------------------------------
 
-    const userAddresses =
-      await db.query.addresses.findMany({
-        where: {
-          userId: user.id,
-        },
+    const userAddresses = await db.query.addresses.findMany({
+      where: {
+        userId: user.id,
+      },
 
-        orderBy: {
-          createdAt: "asc",
-        },
+      orderBy: {
+        createdAt: "asc",
+      },
 
-        columns: {
-          id: true,
-
-          userId: true,
-
-          firstName: true,
-
-          lastName: true,
-
-          phone: true,
-
-          addressLine1: true,
-
-          addressLine2: true,
-
-          city: true,
-
-          state: true,
-
-          country: true,
-
-          postalCode: true,
-
-          isDefault: true,
-
-          createdAt: true,
-
-          updatedAt: true,
-        },
-      });
+      columns: {
+        id: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        state: true,
+        country: true,
+        postalCode: true,
+        isDefault: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     // --------------------------------------------------------
     // RESPONSE
@@ -86,14 +63,10 @@ export async function GET(req: NextRequest) {
 
     return Response.json({
       success: true,
-
       data: userAddresses,
     });
   } catch (error) {
-    console.error(
-      "GET /api/addresses error:",
-      error,
-    );
+    console.error("GET /api/addresses error:", error);
 
     return handleApiError(error);
   }
@@ -101,10 +74,6 @@ export async function GET(req: NextRequest) {
 
 // ============================================================
 // POST /api/addresses
-// ============================================================
-//
-// Create a new address for the logged-in user.
-//
 // ============================================================
 
 export async function POST(req: NextRequest) {
@@ -125,120 +94,84 @@ export async function POST(req: NextRequest) {
     // VALIDATE
     // --------------------------------------------------------
 
-    const input =
-      createAddressSchema.parse(body);
+    const input = createAddressSchema.parse(body);
 
     // --------------------------------------------------------
-    // CHECK EXISTING ADDRESSES
+    // CHECK IF USER ALREADY HAS ADDRESSES
     // --------------------------------------------------------
 
-    const existingAddresses =
-      await db.query.addresses.findMany({
-        where: {
-          userId: user.id,
-        },
+    const existingAddress = await db.query.addresses.findFirst({
+      where: {
+        userId: user.id,
+      },
 
-        columns: {
-          id: true,
-        },
-
-        limit: 1,
-      });
+      columns: {
+        id: true,
+      },
+    });
 
     // --------------------------------------------------------
-    // DETERMINE DEFAULT ADDRESS
-    // --------------------------------------------------------
-    //
-    // If this is the user's first address, automatically
-    // make it the default address.
-    //
-    // If isDefault was explicitly true, also make it default.
-    //
-    // Otherwise it remains a normal address.
-    //
+    // FIRST ADDRESS IS ALWAYS DEFAULT
     // --------------------------------------------------------
 
-    const shouldBeDefault =
-      existingAddresses.length === 0 ||
-      input.isDefault === true;
+    const shouldBeDefault = !existingAddress || input.isDefault === true;
 
     // --------------------------------------------------------
     // CREATE ADDRESS
     // --------------------------------------------------------
 
-    const createdAddress =
-      await db.transaction(async (tx) => {
-        // ----------------------------------------------------
-        // REMOVE EXISTING DEFAULT
-        // ----------------------------------------------------
+    const createdAddress = await db.transaction(async (tx) => {
+      // ----------------------------------------------------
+      // REMOVE EXISTING DEFAULT
+      // ----------------------------------------------------
 
-        if (shouldBeDefault) {
-          await tx
-            .update(addresses)
-            .set({
-              isDefault: false,
+      if (shouldBeDefault) {
+        await tx
+          .update(addresses)
+          .set({
+            isDefault: false,
+            updatedAt: new Date(),
+          })
+          .where(eq(addresses.userId, user.id));
+      }
 
-              updatedAt: new Date(),
-            })
-            .where(
-              eq(
-                addresses.userId,
-                user.id,
-              ),
-            );
-        }
+      // ----------------------------------------------------
+      // INSERT ADDRESS
+      // ----------------------------------------------------
 
-        // ----------------------------------------------------
-        // INSERT ADDRESS
-        // ----------------------------------------------------
+      const [address] = await tx
+        .insert(addresses)
+        .values({
+          userId: user.id,
 
-        const [address] =
-          await tx
-            .insert(addresses)
-            .values({
-              userId: user.id,
+          firstName: input.firstName,
 
-              firstName:
-                input.firstName,
+          lastName: input.lastName,
 
-              lastName:
-                input.lastName,
+          phone: input.phone,
 
-              phone:
-                input.phone,
+          addressLine1: input.addressLine1,
 
-              addressLine1:
-                input.addressLine1,
+          addressLine2: input.addressLine2,
 
-              addressLine2:
-                input.addressLine2,
+          city: input.city,
 
-              city:
-                input.city,
+          state: input.state,
 
-              state:
-                input.state,
+          country: input.country,
 
-              country:
-                input.country,
+          postalCode: input.postalCode,
 
-              postalCode:
-                input.postalCode,
+          isDefault: shouldBeDefault,
+        })
+        .returning();
 
-              isDefault:
-                shouldBeDefault,
-            })
-            .returning();
+      if (!address) {
+        throw new ApiError("Address could not be created", 500);
+      }
 
-        if (!address) {
-          throw new ApiError(
-            "Address could not be created",
-            500,
-          );
-        }
-
-        return address;
-      });
+      return address;
+    });
 
     // --------------------------------------------------------
     // RESPONSE
@@ -250,18 +183,14 @@ export async function POST(req: NextRequest) {
 
         data: createdAddress,
 
-        message:
-          "Address created successfully",
+        message: "Address created successfully",
       },
       {
         status: 201,
       },
     );
   } catch (error) {
-    console.error(
-      "POST /api/addresses error:",
-      error,
-    );
+    console.error("POST /api/addresses error:", error);
 
     return handleApiError(error);
   }

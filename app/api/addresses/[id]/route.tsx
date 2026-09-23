@@ -1,25 +1,16 @@
 import { NextRequest } from "next/server";
 
-import {
-  and,
-  eq,
-} from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { addresses } from "@/db/schema";
 
 import { db } from "@/db/drizzle";
 
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 
 import { requireUser } from "@/lib/APIs/auth";
 
-import {
-  addressIdParamSchema,
-  updateAddressSchema,
-} from "@/lib/validations";
+import { addressIdParamSchema, updateAddressSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
@@ -36,15 +27,8 @@ interface RouteContext {
 // ============================================================
 // GET /api/addresses/[id]
 // ============================================================
-//
-// Get one address belonging to the logged-in user.
-//
-// ============================================================
 
-export async function GET(
-  req: NextRequest,
-  context: RouteContext,
-) {
+export async function GET(req: NextRequest, context: RouteContext) {
   try {
     // --------------------------------------------------------
     // AUTHENTICATE USER
@@ -56,66 +40,46 @@ export async function GET(
     // PARAMS
     // --------------------------------------------------------
 
-    const { id } =
-      await context.params;
+    const { id } = await context.params;
 
-    const params =
-      addressIdParamSchema.parse({
-        id,
-      });
+    const params = addressIdParamSchema.parse({
+      id,
+    });
 
     // --------------------------------------------------------
     // FIND ADDRESS
     // --------------------------------------------------------
 
-    const address =
-      await db.query.addresses.findFirst({
-        where: {
-          id: params.id,
+    const address = await db.query.addresses.findFirst({
+      where: {
+        id: params.id,
+        userId: user.id,
+      },
 
-          userId: user.id,
-        },
-
-        columns: {
-          id: true,
-
-          userId: true,
-
-          firstName: true,
-
-          lastName: true,
-
-          phone: true,
-
-          addressLine1: true,
-
-          addressLine2: true,
-
-          city: true,
-
-          state: true,
-
-          country: true,
-
-          postalCode: true,
-
-          isDefault: true,
-
-          createdAt: true,
-
-          updatedAt: true,
-        },
-      });
+      columns: {
+        id: true,
+        userId: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        addressLine1: true,
+        addressLine2: true,
+        city: true,
+        state: true,
+        country: true,
+        postalCode: true,
+        isDefault: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     // --------------------------------------------------------
     // CHECK ADDRESS
     // --------------------------------------------------------
 
     if (!address) {
-      throw new ApiError(
-        "Address not found",
-        404,
-      );
+      throw new ApiError("Address not found", 404);
     }
 
     // --------------------------------------------------------
@@ -124,14 +88,10 @@ export async function GET(
 
     return Response.json({
       success: true,
-
       data: address,
     });
   } catch (error) {
-    console.error(
-      "GET /api/addresses/[id] error:",
-      error,
-    );
+    console.error("GET /api/addresses/[id] error:", error);
 
     return handleApiError(error);
   }
@@ -140,15 +100,8 @@ export async function GET(
 // ============================================================
 // PATCH /api/addresses/[id]
 // ============================================================
-//
-// Update an address belonging to the logged-in user.
-//
-// ============================================================
 
-export async function PATCH(
-  req: NextRequest,
-  context: RouteContext,
-) {
+export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
     // --------------------------------------------------------
     // AUTHENTICATE USER
@@ -160,32 +113,25 @@ export async function PATCH(
     // PARAMS
     // --------------------------------------------------------
 
-    const { id } =
-      await context.params;
+    const { id } = await context.params;
 
-    const params =
-      addressIdParamSchema.parse({
-        id,
-      });
+    const params = addressIdParamSchema.parse({
+      id,
+    });
 
     // --------------------------------------------------------
-    // CHECK ADDRESS OWNERSHIP
+    // FIND EXISTING ADDRESS
     // --------------------------------------------------------
 
-    const existingAddress =
-      await db.query.addresses.findFirst({
-        where: {
-          id: params.id,
-
-          userId: user.id,
-        },
-      });
+    const existingAddress = await db.query.addresses.findFirst({
+      where: {
+        id: params.id,
+        userId: user.id,
+      },
+    });
 
     if (!existingAddress) {
-      throw new ApiError(
-        "Address not found",
-        404,
-      );
+      throw new ApiError("Address not found", 404);
     }
 
     // --------------------------------------------------------
@@ -198,167 +144,199 @@ export async function PATCH(
     // VALIDATE
     // --------------------------------------------------------
 
-    const input =
-      updateAddressSchema.parse(body);
+    const input = updateAddressSchema.parse(body);
 
     // --------------------------------------------------------
     // UPDATE ADDRESS
     // --------------------------------------------------------
 
-    const updatedAddress =
-      await db.transaction(async (tx) => {
-        // ----------------------------------------------------
-        // IF SETTING THIS ADDRESS AS DEFAULT
-        // ----------------------------------------------------
+    const updatedAddress = await db.transaction(async (tx) => {
+      // ====================================================
+      // CASE 1:
+      // SET THIS ADDRESS AS DEFAULT
+      // ====================================================
 
-        if (input.isDefault === true) {
+      if (input.isDefault === true) {
+        // Remove default from every other
+        // address belonging to this user.
+
+        await tx
+          .update(addresses)
+          .set({
+            isDefault: false,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(eq(addresses.userId, user.id), eq(addresses.isDefault, true)),
+          );
+      }
+
+      // ====================================================
+      // CASE 2:
+      // TRYING TO REMOVE DEFAULT
+      // ====================================================
+
+      if (input.isDefault === false && existingAddress.isDefault) {
+        // Check whether the user has another address.
+
+        const otherAddress = await tx.query.addresses.findFirst({
+          where: {
+            userId: user.id,
+          },
+
+          columns: {
+            id: true,
+          },
+
+          orderBy: {
+            createdAt: "asc",
+          },
+        });
+
+        // --------------------------------------------------
+        // There is another address.
+        // Promote it to default.
+        // --------------------------------------------------
+
+        if (otherAddress && otherAddress.id !== existingAddress.id) {
           await tx
             .update(addresses)
             .set({
-              isDefault: false,
-
+              isDefault: true,
               updatedAt: new Date(),
             })
-            .where(
-              eq(
-                addresses.userId,
-                user.id,
-              ),
-            );
+            .where(eq(addresses.id, otherAddress.id));
+
+          // The current address must remain
+          // non-default.
+        } else {
+          // ------------------------------------------------
+          // This is the user's only address.
+          //
+          // We do not allow the user to have zero
+          // default addresses.
+          // ------------------------------------------------
+
+          input.isDefault = true;
         }
+      }
 
-        // ----------------------------------------------------
-        // BUILD UPDATE VALUES
-        // ----------------------------------------------------
+      // ====================================================
+      // BUILD UPDATE VALUES
+      // ====================================================
 
-        const updateValues: {
-          firstName?: string;
+      const updateValues: {
+        firstName?: string;
+        lastName?: string;
+        phone?: string;
+        addressLine1?: string;
+        addressLine2?: string | null;
+        city?: string;
+        state?: string;
+        country?: string;
+        postalCode?: string | null;
+        isDefault?: boolean;
+        updatedAt: Date;
+      } = {
+        updatedAt: new Date(),
+      };
 
-          lastName?: string;
+      // ----------------------------------------------------
+      // FIRST NAME
+      // ----------------------------------------------------
 
-          phone?: string;
+      if (input.firstName !== undefined) {
+        updateValues.firstName = input.firstName;
+      }
 
-          addressLine1?: string;
+      // ----------------------------------------------------
+      // LAST NAME
+      // ----------------------------------------------------
 
-          addressLine2?: string | null;
+      if (input.lastName !== undefined) {
+        updateValues.lastName = input.lastName;
+      }
 
-          city?: string;
+      // ----------------------------------------------------
+      // PHONE
+      // ----------------------------------------------------
 
-          state?: string;
+      if (input.phone !== undefined) {
+        updateValues.phone = input.phone;
+      }
 
-          country?: string;
+      // ----------------------------------------------------
+      // ADDRESS LINE 1
+      // ----------------------------------------------------
 
-          postalCode?: string | null;
+      if (input.addressLine1 !== undefined) {
+        updateValues.addressLine1 = input.addressLine1;
+      }
 
-          isDefault?: boolean;
+      // ----------------------------------------------------
+      // ADDRESS LINE 2
+      // ----------------------------------------------------
 
-          updatedAt: Date;
-        } = {
-          updatedAt: new Date(),
-        };
+      if (input.addressLine2 !== undefined) {
+        updateValues.addressLine2 = input.addressLine2;
+      }
 
-        if (
-          input.firstName !== undefined
-        ) {
-          updateValues.firstName =
-            input.firstName;
-        }
+      // ----------------------------------------------------
+      // CITY
+      // ----------------------------------------------------
 
-        if (
-          input.lastName !== undefined
-        ) {
-          updateValues.lastName =
-            input.lastName;
-        }
+      if (input.city !== undefined) {
+        updateValues.city = input.city;
+      }
 
-        if (
-          input.phone !== undefined
-        ) {
-          updateValues.phone =
-            input.phone;
-        }
+      // ----------------------------------------------------
+      // STATE
+      // ----------------------------------------------------
 
-        if (
-          input.addressLine1 !== undefined
-        ) {
-          updateValues.addressLine1 =
-            input.addressLine1;
-        }
+      if (input.state !== undefined) {
+        updateValues.state = input.state;
+      }
 
-        if (
-          input.addressLine2 !== undefined
-        ) {
-          updateValues.addressLine2 =
-            input.addressLine2;
-        }
+      // ----------------------------------------------------
+      // COUNTRY
+      // ----------------------------------------------------
 
-        if (
-          input.city !== undefined
-        ) {
-          updateValues.city =
-            input.city;
-        }
+      if (input.country !== undefined) {
+        updateValues.country = input.country;
+      }
 
-        if (
-          input.state !== undefined
-        ) {
-          updateValues.state =
-            input.state;
-        }
+      // ----------------------------------------------------
+      // POSTAL CODE
+      // ----------------------------------------------------
 
-        if (
-          input.country !== undefined
-        ) {
-          updateValues.country =
-            input.country;
-        }
+      if (input.postalCode !== undefined) {
+        updateValues.postalCode = input.postalCode;
+      }
 
-        if (
-          input.postalCode !== undefined
-        ) {
-          updateValues.postalCode =
-            input.postalCode;
-        }
+      // ----------------------------------------------------
+      // DEFAULT STATUS
+      // ----------------------------------------------------
 
-        if (
-          input.isDefault !== undefined
-        ) {
-          updateValues.isDefault =
-            input.isDefault;
-        }
+      if (input.isDefault !== undefined) {
+        updateValues.isDefault = input.isDefault;
+      }
 
-        // ----------------------------------------------------
-        // UPDATE
-        // ----------------------------------------------------
+      // ====================================================
+      // UPDATE
+      // ====================================================
 
-        const [address] =
-          await tx
-            .update(addresses)
-            .set(updateValues)
-            .where(
-              and(
-                eq(
-                  addresses.id,
-                  params.id,
-                ),
+      const [address] = await tx
+        .update(addresses)
+        .set(updateValues)
+        .where(and(eq(addresses.id, params.id), eq(addresses.userId, user.id)))
+        .returning();
 
-                eq(
-                  addresses.userId,
-                  user.id,
-                ),
-              ),
-            )
-            .returning();
+      if (!address) {
+        throw new ApiError("Address could not be updated", 500);
+      }
 
-        if (!address) {
-          throw new ApiError(
-            "Address could not be updated",
-            500,
-          );
-        }
-
-        return address;
-      });
+      return address;
+    });
 
     // --------------------------------------------------------
     // RESPONSE
@@ -369,14 +347,10 @@ export async function PATCH(
 
       data: updatedAddress,
 
-      message:
-        "Address updated successfully",
+      message: "Address updated successfully",
     });
   } catch (error) {
-    console.error(
-      "PATCH /api/addresses/[id] error:",
-      error,
-    );
+    console.error("PATCH /api/addresses/[id] error:", error);
 
     return handleApiError(error);
   }
@@ -385,18 +359,8 @@ export async function PATCH(
 // ============================================================
 // DELETE /api/addresses/[id]
 // ============================================================
-//
-// Delete an address belonging to the logged-in user.
-//
-// If the deleted address was the default address, another
-// address is automatically promoted to default.
-//
-// ============================================================
 
-export async function DELETE(
-  req: NextRequest,
-  context: RouteContext,
-) {
+export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
     // --------------------------------------------------------
     // AUTHENTICATE USER
@@ -408,32 +372,25 @@ export async function DELETE(
     // PARAMS
     // --------------------------------------------------------
 
-    const { id } =
-      await context.params;
+    const { id } = await context.params;
 
-    const params =
-      addressIdParamSchema.parse({
-        id,
-      });
+    const params = addressIdParamSchema.parse({
+      id,
+    });
 
     // --------------------------------------------------------
     // FIND ADDRESS
     // --------------------------------------------------------
 
-    const existingAddress =
-      await db.query.addresses.findFirst({
-        where: {
-          id: params.id,
-
-          userId: user.id,
-        },
-      });
+    const existingAddress = await db.query.addresses.findFirst({
+      where: {
+        id: params.id,
+        userId: user.id,
+      },
+    });
 
     if (!existingAddress) {
-      throw new ApiError(
-        "Address not found",
-        404,
-      );
+      throw new ApiError("Address not found", 404);
     }
 
     // --------------------------------------------------------
@@ -447,42 +404,29 @@ export async function DELETE(
 
       await tx
         .delete(addresses)
-        .where(
-          and(
-            eq(
-              addresses.id,
-              params.id,
-            ),
-
-            eq(
-              addresses.userId,
-              user.id,
-            ),
-          ),
-        );
+        .where(and(eq(addresses.id, params.id), eq(addresses.userId, user.id)));
 
       // ------------------------------------------------------
       // IF DEFAULT WAS DELETED
       // ------------------------------------------------------
 
       if (existingAddress.isDefault) {
-        const nextAddress =
-          await tx.query.addresses.findFirst({
-            where: {
-              userId: user.id,
-            },
+        const nextAddress = await tx.query.addresses.findFirst({
+          where: {
+            userId: user.id,
+          },
 
-            orderBy: {
-              createdAt: "asc",
-            },
+          orderBy: {
+            createdAt: "asc",
+          },
 
-            columns: {
-              id: true,
-            },
-          });
+          columns: {
+            id: true,
+          },
+        });
 
         // ----------------------------------------------------
-        // MAKE ANOTHER ADDRESS DEFAULT
+        // PROMOTE NEXT ADDRESS
         // ----------------------------------------------------
 
         if (nextAddress) {
@@ -490,15 +434,9 @@ export async function DELETE(
             .update(addresses)
             .set({
               isDefault: true,
-
               updatedAt: new Date(),
             })
-            .where(
-              eq(
-                addresses.id,
-                nextAddress.id,
-              ),
-            );
+            .where(eq(addresses.id, nextAddress.id));
         }
       }
     });
@@ -510,14 +448,10 @@ export async function DELETE(
     return Response.json({
       success: true,
 
-      message:
-        "Address deleted successfully",
+      message: "Address deleted successfully",
     });
   } catch (error) {
-    console.error(
-      "DELETE /api/addresses/[id] error:",
-      error,
-    );
+    console.error("DELETE /api/addresses/[id] error:", error);
 
     return handleApiError(error);
   }

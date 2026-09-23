@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { products, productImages, productVariants } from "@/db/schema";
 
@@ -56,6 +56,330 @@ function isValidImageFile(file: File): boolean {
   return VALID_IMAGE_EXTENSIONS.some((extension) =>
     fileName.endsWith(extension),
   );
+}
+
+// ============================================================
+// GET
+// ============================================================
+//
+// GET /api/admin/products/[slug]
+//
+// Returns a single product for the admin product
+// detail/edit page.
+//
+// Includes:
+//
+// - Product information
+// - Category
+// - Product images
+// - Color variants
+// - Stock
+// - Reserved stock
+// - Available stock
+// - Cost price
+// - Deleted date
+//
+// ============================================================
+
+export async function GET(req: NextRequest, context: RouteContext) {
+  try {
+    // ========================================================
+    // REQUIRE ADMIN
+    // ========================================================
+
+    await requireAdmin();
+
+    // ========================================================
+    // PARAMS
+    // ========================================================
+
+    const { slug } = await context.params;
+
+    if (!slug) {
+      throw new ApiError("Product slug is required", 400);
+    }
+
+    // ========================================================
+    // FIND PRODUCT
+    // ========================================================
+
+    const product = await db.query.products.findFirst({
+      where: {
+        slug,
+      },
+
+      // ======================================================
+      // PRODUCT COLUMNS
+      // ======================================================
+
+      columns: {
+        id: true,
+
+        name: true,
+
+        slug: true,
+
+        sku: true,
+
+        description: true,
+
+        categoryId: true,
+
+        price: true,
+
+        compareAtPrice: true,
+
+        costPrice: true,
+
+        status: true,
+
+        isFeatured: true,
+
+        isNewArrival: true,
+
+        isBestSeller: true,
+
+        averageRating: true,
+
+        ratingCount: true,
+
+        soldCount: true,
+
+        metaTitle: true,
+
+        metaDescription: true,
+
+        createdAt: true,
+
+        updatedAt: true,
+
+        deletedAt: true,
+      },
+
+      // ======================================================
+      // RELATIONS
+      // ======================================================
+
+      with: {
+        // ----------------------------------------------------
+        // CATEGORY
+        // ----------------------------------------------------
+
+        category: {
+          columns: {
+            id: true,
+
+            name: true,
+
+            slug: true,
+          },
+        },
+
+        // ----------------------------------------------------
+        // IMAGES
+        // ----------------------------------------------------
+
+        images: {
+          orderBy: {
+            position: "asc",
+          },
+
+          columns: {
+            id: true,
+
+            url: true,
+
+            publicId: true,
+
+            position: true,
+
+            isPrimary: true,
+
+            createdAt: true,
+          },
+        },
+
+        // ----------------------------------------------------
+        // COLOR VARIANTS
+        // ----------------------------------------------------
+
+        variants: {
+          orderBy: {
+            createdAt: "asc",
+          },
+
+          columns: {
+            id: true,
+
+            productId: true,
+
+            colorId: true,
+
+            sku: true,
+
+            stock: true,
+
+            reservedStock: true,
+
+            createdAt: true,
+
+            updatedAt: true,
+          },
+
+          with: {
+            color: {
+              columns: {
+                id: true,
+
+                name: true,
+
+                hexCode: true,
+
+                isActive: true,
+
+                createdAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // ========================================================
+    // PRODUCT NOT FOUND
+    // ========================================================
+
+    if (!product) {
+      throw new ApiError("Product not found", 404);
+    }
+
+    // ========================================================
+    // FORMAT VARIANTS
+    // ========================================================
+
+    const variants = product.variants.map((variant) => ({
+      id: variant.id,
+
+      productId: variant.productId,
+
+      colorId: variant.colorId,
+
+      sku: variant.sku,
+
+      stock: variant.stock,
+
+      reservedStock: variant.reservedStock,
+
+      availableStock: Math.max(variant.stock - variant.reservedStock, 0),
+
+      inStock: variant.stock > variant.reservedStock,
+
+      color: variant.color,
+
+      createdAt: variant.createdAt,
+
+      updatedAt: variant.updatedAt,
+    }));
+
+    // ========================================================
+    // STOCK SUMMARY
+    // ========================================================
+
+    const totalStock = variants.reduce(
+      (total, variant) => total + variant.stock,
+      0,
+    );
+
+    const totalReservedStock = variants.reduce(
+      (total, variant) => total + variant.reservedStock,
+      0,
+    );
+
+    const totalAvailableStock = variants.reduce(
+      (total, variant) => total + variant.availableStock,
+      0,
+    );
+
+    const hasAvailableStock = variants.some((variant) => variant.inStock);
+
+    // ========================================================
+    // RESPONSE DATA
+    // ========================================================
+
+    const data = {
+      id: product.id,
+
+      name: product.name,
+
+      slug: product.slug,
+
+      sku: product.sku,
+
+      description: product.description,
+
+      categoryId: product.categoryId,
+
+      category: product.category,
+
+      price: product.price,
+
+      compareAtPrice: product.compareAtPrice,
+
+      costPrice: product.costPrice,
+
+      status: product.status,
+
+      isFeatured: product.isFeatured,
+
+      isNewArrival: product.isNewArrival,
+
+      isBestSeller: product.isBestSeller,
+
+      averageRating: product.averageRating,
+
+      ratingCount: product.ratingCount,
+
+      soldCount: product.soldCount,
+
+      metaTitle: product.metaTitle,
+
+      metaDescription: product.metaDescription,
+
+      images: product.images,
+
+      variants,
+
+      stockSummary: {
+        totalStock,
+
+        totalReservedStock,
+
+        totalAvailableStock,
+
+        hasAvailableStock,
+      },
+
+      createdAt: product.createdAt,
+
+      updatedAt: product.updatedAt,
+
+      deletedAt: product.deletedAt,
+    };
+
+    // ========================================================
+    // RESPONSE
+    // ========================================================
+
+    return Response.json({
+      success: true,
+
+      data,
+    });
+  } catch (error) {
+    console.error("GET /api/admin/products/[slug] error:", error);
+
+    return handleApiError(error);
+  }
 }
 
 // ============================================================
@@ -181,6 +505,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
         uploadedImages.push({
           url: uploaded.url,
+
           publicId: uploaded.publicId,
         });
       }

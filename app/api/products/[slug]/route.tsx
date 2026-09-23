@@ -259,7 +259,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     });
   } catch (error) {
     console.error("GET /api/products/[slug] error:", error);
-
+ 
     return handleApiError(error);
   }
 }

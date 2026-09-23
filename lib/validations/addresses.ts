@@ -66,7 +66,7 @@ export const createAddressSchema = z.object({
   isDefault: z
     .boolean()
     .optional(),
-});
+  });
 
 // ============================================================
 // UPDATE ADDRESS

@@ -1,8 +1,22 @@
 import { NextRequest } from "next/server";
 
-import { and, asc, desc, eq, gte, ilike, isNull, lte, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gte,
+  ilike,
+  isNull,
+  lte,
+  notExists,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
-import { products, productImages, productVariants } from "@/db/schema";
+import { products, productVariants } from "@/db/schema";
 
 import { db } from "@/db/drizzle";
 
@@ -18,20 +32,20 @@ export const runtime = "nodejs";
 //
 // Public product listing.
 //
-// Only active products are returned.
+// IMPORTANT:
 //
-// Supports:
-// - search
-// - categoryId
-// - colorId
-// - minPrice
-// - maxPrice
-// - inStock
-// - isFeatured
-// - isNewArrival
-// - isBestSeller
+// All filters are applied inside PostgreSQL BEFORE:
+//
 // - pagination
-// - sorting
+// - counting
+//
+// This keeps:
+//
+// data
+// pagination.total
+// pagination.totalPages
+//
+// consistent with each other.
 //
 // ============================================================
 
@@ -89,7 +103,7 @@ export async function GET(req: NextRequest) {
     // FILTER CONDITIONS
     // ========================================================
 
-    const conditions = [];
+    const conditions: SQL[] = [];
 
     // --------------------------------------------------------
     // ONLY ACTIVE PRODUCTS
@@ -98,24 +112,27 @@ export async function GET(req: NextRequest) {
     conditions.push(eq(products.status, "active"));
 
     // --------------------------------------------------------
-    // DO NOT SHOW DELETED PRODUCTS
+    // DO NOT SHOW SOFT-DELETED PRODUCTS
     // --------------------------------------------------------
 
     conditions.push(isNull(products.deletedAt));
+
     // --------------------------------------------------------
     // SEARCH
     // --------------------------------------------------------
 
     if (query.search) {
-      conditions.push(
-        or(
-          ilike(products.name, `%${query.search}%`),
+      const searchCondition = or(
+        ilike(products.name, `%${query.search}%`),
 
-          ilike(products.description, `%${query.search}%`),
+        ilike(products.description, `%${query.search}%`),
 
-          ilike(products.sku, `%${query.search}%`),
-        ),
+        ilike(products.sku, `%${query.search}%`),
       );
+
+      if (searchCondition) {
+        conditions.push(searchCondition);
+      }
     }
 
     // --------------------------------------------------------
@@ -124,6 +141,39 @@ export async function GET(req: NextRequest) {
 
     if (query.categoryId) {
       conditions.push(eq(products.categoryId, query.categoryId));
+    }
+
+    // --------------------------------------------------------
+    // COLOR
+    // --------------------------------------------------------
+    //
+    // IMPORTANT:
+    //
+    // We check for the color in PostgreSQL BEFORE
+    // pagination.
+    //
+    // A product matches when at least one variant
+    // has the selected color.
+    //
+    // --------------------------------------------------------
+
+    if (query.colorId) {
+      const colorExists = exists(
+        db
+          .select({
+            id: productVariants.id,
+          })
+          .from(productVariants)
+          .where(
+            and(
+              eq(productVariants.productId, products.id),
+
+              eq(productVariants.colorId, query.colorId),
+            ),
+          ),
+      );
+
+      conditions.push(colorExists);
     }
 
     // --------------------------------------------------------
@@ -162,8 +212,73 @@ export async function GET(req: NextRequest) {
       conditions.push(eq(products.isBestSeller, true));
     }
 
+    // --------------------------------------------------------
+    // IN STOCK
+    // --------------------------------------------------------
+    //
+    // A product is considered in stock when at least
+    // one color has available stock:
+    //
+    // stock > reservedStock
+    //
+    // --------------------------------------------------------
+
+    if (query.inStock === true) {
+      const stockExists = exists(
+        db
+          .select({
+            id: productVariants.id,
+          })
+          .from(productVariants)
+          .where(
+            and(
+              eq(productVariants.productId, products.id),
+
+              sql`
+                ${productVariants.stock}
+                >
+                ${productVariants.reservedStock}
+              `,
+            ),
+          ),
+      );
+
+      conditions.push(stockExists);
+    }
+
+    // --------------------------------------------------------
+    // OUT OF STOCK
+    // --------------------------------------------------------
+    //
+    // No variant has available stock.
+    //
+    // --------------------------------------------------------
+
+    if (query.inStock === false) {
+      const stockDoesNotExist = notExists(
+        db
+          .select({
+            id: productVariants.id,
+          })
+          .from(productVariants)
+          .where(
+            and(
+              eq(productVariants.productId, products.id),
+
+              sql`
+                ${productVariants.stock}
+                >
+                ${productVariants.reservedStock}
+              `,
+            ),
+          ),
+      );
+
+      conditions.push(stockDoesNotExist);
+    }
+
     // ========================================================
-    // WHERE CONDITION
+    // FINAL WHERE CONDITION
     // ========================================================
 
     const whereCondition =
@@ -173,25 +288,53 @@ export async function GET(req: NextRequest) {
     // ORDER BY
     // ========================================================
 
-    const orderBy =
-      query.sort === "newest"
-        ? desc(products.createdAt)
-        : query.sort === "oldest"
-          ? asc(products.createdAt)
-          : query.sort === "price_asc"
-            ? asc(products.price)
-            : query.sort === "price_desc"
-              ? desc(products.price)
-              : query.sort === "name_asc"
-                ? asc(products.name)
-                : query.sort === "name_desc"
-                  ? desc(products.name)
-                  : query.sort === "rating"
-                    ? desc(products.averageRating)
-                    : desc(products.soldCount);
+    let orderBy: SQL;
+
+    switch (query.sort) {
+      case "oldest":
+        orderBy = asc(products.createdAt);
+        break;
+
+      case "price_asc":
+        orderBy = asc(products.price);
+        break;
+
+      case "price_desc":
+        orderBy = desc(products.price);
+        break;
+
+      case "name_asc":
+        orderBy = asc(products.name);
+        break;
+
+      case "name_desc":
+        orderBy = desc(products.name);
+        break;
+
+      case "rating":
+        orderBy = desc(products.averageRating);
+        break;
+
+      case "best_selling":
+        orderBy = desc(products.soldCount);
+        break;
+
+      case "newest":
+      default:
+        orderBy = desc(products.createdAt);
+        break;
+    }
 
     // ========================================================
     // GET PRODUCTS
+    // ========================================================
+    //
+    // IMPORTANT:
+    //
+    // At this point ALL filters have already been applied.
+    //
+    // Therefore pagination is now correct.
+    //
     // ========================================================
 
     const productRows = await db
@@ -209,17 +352,23 @@ export async function GET(req: NextRequest) {
         status: products.status,
 
         isFeatured: products.isFeatured,
+
         isNewArrival: products.isNewArrival,
+
         isBestSeller: products.isBestSeller,
 
         averageRating: products.averageRating,
+
         ratingCount: products.ratingCount,
+
         soldCount: products.soldCount,
 
         metaTitle: products.metaTitle,
+
         metaDescription: products.metaDescription,
 
         createdAt: products.createdAt,
+
         updatedAt: products.updatedAt,
       })
       .from(products)
@@ -320,36 +469,10 @@ export async function GET(req: NextRequest) {
     }
 
     // ========================================================
-    // COLOR FILTER
-    // ========================================================
-
-    let filteredRows = rows;
-
-    if (query.colorId) {
-      filteredRows = filteredRows.filter((product) =>
-        product.variants.some((variant) => variant.colorId === query.colorId),
-      );
-    }
-
-    // ========================================================
-    // IN STOCK FILTER
-    // ========================================================
-
-    if (query.inStock !== undefined) {
-      filteredRows = filteredRows.filter((product) => {
-        const hasAvailableStock = product.variants.some(
-          (variant) => variant.stock > variant.reservedStock,
-        );
-
-        return query.inStock ? hasAvailableStock : !hasAvailableStock;
-      });
-    }
-
-    // ========================================================
     // FORMAT PUBLIC RESPONSE
     // ========================================================
 
-    const data = filteredRows.map((product) => ({
+    const data = rows.map((product) => ({
       id: product.id,
 
       name: product.name,
@@ -411,6 +534,26 @@ export async function GET(req: NextRequest) {
 
     // ========================================================
     // COUNT
+    // ========================================================
+    //
+    // IMPORTANT:
+    //
+    // This uses the EXACT SAME whereCondition as
+    // the product query.
+    //
+    // Therefore total now respects:
+    //
+    // - search
+    // - category
+    // - color
+    // - price
+    // - stock
+    // - featured
+    // - new arrival
+    // - best seller
+    // - active status
+    // - deletedAt
+    //
     // ========================================================
 
     const total = await db.$count(products, whereCondition);

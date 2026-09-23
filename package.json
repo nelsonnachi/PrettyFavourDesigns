@@ -1,0 +1,52 @@
+{
+  "name": "shoppfd",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "tsx db/seed/seeding.ts"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.8.0",
+    "@clerk/nextjs": "^7.9.4",
+    "@neondatabase/serverless": "^1.1.0",
+    "@tanstack/react-query": "^5.103.2",
+    "class-variance-authority": "^0.7.1",
+    "cloudinary": "^2.11.0",
+    "cn": "^0.3.2",
+    "dotenv": "^18.0.1",
+    "drizzle-orm": "^1.0.0-rc.4",
+    "lucide": "^1.47.0",
+    "motion": "^13.4.0",
+    "next": "^16.3.5",
+    "next-cloudinary": "^6.19.3",
+    "postcss": "^8.5.28",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^1.0.0-rc.4",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "ngrok": "^5.0.0-beta.2",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.1.0"
+  }
+}

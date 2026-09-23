@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { apiClient } from "@/lib/api/client";
+
 import { ratingKeys } from "./rating-keys";
 
 import type {
@@ -7,7 +9,6 @@ import type {
   Rating,
   UpdateRatingInput,
 } from "./rating-types";
-import { apiClient } from "@/lib/api/client";
 
 // ============================================================
 // RESPONSE TYPES
@@ -15,17 +16,21 @@ import { apiClient } from "@/lib/api/client";
 
 interface RatingsResponse {
   success: boolean;
+
   data: Rating[];
 }
 
 interface RatingResponse {
   success: boolean;
+
   data: Rating;
+
   message?: string;
 }
 
 interface DeleteRatingResponse {
   success: boolean;
+
   message: string;
 }
 
@@ -36,8 +41,6 @@ interface DeleteRatingResponse {
 // GET /api/products/[slug]/ratings
 //
 // Public endpoint.
-//
-// Customers can use this to see all ratings for a product.
 //
 // ============================================================
 
@@ -75,10 +78,6 @@ async function createRating(input: CreateRatingInput): Promise<Rating> {
 //
 // PATCH /api/ratings/[id]
 //
-// Requires authentication.
-//
-// A user can only update their own rating.
-//
 // ============================================================
 
 async function updateRating({
@@ -86,6 +85,7 @@ async function updateRating({
   data,
 }: {
   id: string;
+
   data: UpdateRatingInput;
 }): Promise<Rating> {
   const response = await apiClient<RatingResponse>(`/api/ratings/${id}`, {
@@ -103,10 +103,6 @@ async function updateRating({
 //
 // DELETE /api/ratings/[id]
 //
-// Requires authentication.
-//
-// A user can only delete their own rating.
-//
 // ============================================================
 
 async function deleteRating(id: string): Promise<void> {
@@ -116,7 +112,7 @@ async function deleteRating(id: string): Promise<void> {
 }
 
 // ============================================================
-// GET PRODUCT RATINGS QUERY
+// GET PRODUCT RATINGS
 // ============================================================
 
 export function useProductRatings(slug: string) {
@@ -132,7 +128,7 @@ export function useProductRatings(slug: string) {
 }
 
 // ============================================================
-// CREATE RATING MUTATION
+// CREATE RATING
 // ============================================================
 
 export function useCreateRating() {
@@ -143,24 +139,26 @@ export function useCreateRating() {
 
     onSuccess: (_createdRating, variables) => {
       // ------------------------------------------------------
-      // Refresh the product ratings.
-      //
-      // The API also updates:
-      // - product.averageRating
-      // - product.ratingCount
-      //
-      // So we need the product query refreshed as well.
+      // Refresh ratings for this product.
       // ------------------------------------------------------
 
       queryClient.invalidateQueries({
         queryKey: ratingKeys.product(variables.productId),
       });
+
+      // ------------------------------------------------------
+      // The product averageRating and ratingCount were also
+      // updated by the backend.
+      //
+      // Product cache can be invalidated here once the
+      // product query key is available.
+      // ------------------------------------------------------
     },
   });
 }
 
 // ============================================================
-// UPDATE RATING MUTATION
+// UPDATE RATING
 // ============================================================
 
 export function useUpdateRating() {
@@ -171,7 +169,7 @@ export function useUpdateRating() {
 
     onSuccess: (updatedRating) => {
       // ------------------------------------------------------
-      // Cache the updated rating.
+      // Update the rating detail cache.
       // ------------------------------------------------------
 
       queryClient.setQueryData(
@@ -180,15 +178,7 @@ export function useUpdateRating() {
       );
 
       // ------------------------------------------------------
-      // Refresh product ratings.
-      //
-      // The product average and count are also recalculated
-      // by the backend.
-      // ------------------------------------------------------
-      //
-      // We don't know the product slug from the update
-      // response, so the product rating queries are handled
-      // through invalidation below.
+      // Refresh all product rating lists.
       // ------------------------------------------------------
 
       queryClient.invalidateQueries({
@@ -199,7 +189,7 @@ export function useUpdateRating() {
 }
 
 // ============================================================
-// DELETE RATING MUTATION
+// DELETE RATING
 // ============================================================
 
 export function useDeleteRating() {
@@ -210,7 +200,7 @@ export function useDeleteRating() {
 
     onSuccess: (_data, deletedId) => {
       // ------------------------------------------------------
-      // Remove the deleted rating from its detail cache.
+      // Remove rating detail cache.
       // ------------------------------------------------------
 
       queryClient.removeQueries({
@@ -218,11 +208,7 @@ export function useDeleteRating() {
       });
 
       // ------------------------------------------------------
-      // Refresh product ratings.
-      //
-      // The backend recalculates the product's:
-      // - averageRating
-      // - ratingCount
+      // Refresh product rating lists.
       // ------------------------------------------------------
 
       queryClient.invalidateQueries({

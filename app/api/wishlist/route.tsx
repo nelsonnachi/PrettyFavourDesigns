@@ -3,23 +3,13 @@ import { NextRequest } from "next/server";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
-import {
-  products,
-  wishlistItems,
-} from "@/db/schema";
+import { products, wishlistItems } from "@/db/schema";
 
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 
-import {
-  requireUser,
-} from "@/lib/APIs/auth";
+import { requireUser } from "@/lib/APIs/auth";
 
-import {
-  addWishlistSchema,
-} from "@/lib/validations";
+import { addWishlistSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
@@ -31,9 +21,7 @@ export const runtime = "nodejs";
 //
 // ============================================================
 
-export async function GET(
-  req: NextRequest,
-) {
+export async function GET(req: NextRequest) {
   try {
     // ========================================================
     // REQUIRE USER
@@ -45,78 +33,46 @@ export async function GET(
     // GET WISHLIST
     // ========================================================
 
-    const items =
-      await db
-        .select({
-          id:
-            wishlistItems.id,
+    const items = await db
+      .select({
+        id: wishlistItems.id,
 
-          productId:
-            wishlistItems.productId,
+        productId: wishlistItems.productId,
 
-          createdAt:
-            wishlistItems.createdAt,
+        createdAt: wishlistItems.createdAt,
 
-          product: {
-            id:
-              products.id,
+        product: {
+          id: products.id,
 
-            name:
-              products.name,
+          name: products.name,
 
-            slug:
-              products.slug,
+          slug: products.slug,
 
-            sku:
-              products.sku,
+          sku: products.sku,
 
-            price:
-              products.price,
+          price: products.price,
 
-            compareAtPrice:
-              products.compareAtPrice,
+          compareAtPrice: products.compareAtPrice,
 
-            status:
-              products.status,
+          status: products.status,
 
-            isFeatured:
-              products.isFeatured,
+          isFeatured: products.isFeatured,
 
-            isNewArrival:
-              products.isNewArrival,
+          isNewArrival: products.isNewArrival,
 
-            isBestSeller:
-              products.isBestSeller,
+          isBestSeller: products.isBestSeller,
 
-            averageRating:
-              products.averageRating,
+          averageRating: products.averageRating,
 
-            ratingCount:
-              products.ratingCount,
+          ratingCount: products.ratingCount,
 
-            soldCount:
-              products.soldCount,
-          },
-        })
-        .from(wishlistItems)
-        .innerJoin(
-          products,
-          eq(
-            wishlistItems.productId,
-            products.id,
-          ),
-        )
-        .where(
-          eq(
-            wishlistItems.userId,
-            user.id,
-          ),
-        )
-        .orderBy(
-          desc(
-            wishlistItems.createdAt,
-          ),
-        );
+          soldCount: products.soldCount,
+        },
+      })
+      .from(wishlistItems)
+      .innerJoin(products, eq(wishlistItems.productId, products.id))
+      .where(eq(wishlistItems.userId, user.id))
+      .orderBy(desc(wishlistItems.createdAt));
 
     // ========================================================
     // RESPONSE
@@ -130,10 +86,7 @@ export async function GET(
       count: items.length,
     });
   } catch (error) {
-    console.error(
-      "GET /api/wishlist error:",
-      error,
-    );
+    console.error("GET /api/wishlist error:", error);
 
     return handleApiError(error);
   }
@@ -153,9 +106,7 @@ export async function GET(
 //
 // ============================================================
 
-export async function POST(
-  req: NextRequest,
-) {
+export async function POST(req: NextRequest) {
   try {
     // ========================================================
     // REQUIRE USER
@@ -167,93 +118,63 @@ export async function POST(
     // REQUEST BODY
     // ========================================================
 
-    const body =
-      await req.json();
+    const body = await req.json();
 
     // ========================================================
     // VALIDATE
     // ========================================================
 
-    const input =
-      addWishlistSchema.parse(body);
+    const input = addWishlistSchema.parse(body);
 
     // ========================================================
     // CHECK PRODUCT
     // ========================================================
 
-    const productResult =
-      await db
-        .select({
-          id:
-            products.id,
+    const productResult = await db
+      .select({
+        id: products.id,
 
-          status:
-            products.status,
+        status: products.status,
 
-          deletedAt:
-            products.deletedAt,
-        })
-        .from(products)
-        .where(
-          eq(
-            products.id,
-            input.productId,
-          ),
-        )
-        .limit(1);
+        deletedAt: products.deletedAt,
+      })
+      .from(products)
+      .where(eq(products.id, input.productId))
+      .limit(1);
 
-    const product =
-      productResult[0];
+    const product = productResult[0];
 
     if (!product) {
-      throw new ApiError(
-        "Product not found",
-        404,
-      );
+      throw new ApiError("Product not found", 404);
     }
 
     // ========================================================
     // PRODUCT MUST BE ACTIVE
     // ========================================================
 
-    if (
-      product.status !== "active" ||
-      product.deletedAt !== null
-    ) {
-      throw new ApiError(
-        "Product is not available",
-        404,
-      );
+    if (product.status !== "active" || product.deletedAt !== null) {
+      throw new ApiError("Product is not available", 404);
     }
 
     // ========================================================
     // CHECK EXISTING WISHLIST ITEM
     // ========================================================
 
-    const existingResult =
-      await db
-        .select({
-          id:
-            wishlistItems.id,
-        })
-        .from(wishlistItems)
-        .where(
-          and(
-            eq(
-              wishlistItems.userId,
-              user.id,
-            ),
+    const existingResult = await db
+      .select({
+        id: wishlistItems.id,
+      })
+      .from(wishlistItems)
+      .where(
+        and(
+          eq(wishlistItems.userId, user.id),
 
-            eq(
-              wishlistItems.productId,
-              input.productId,
-            ),
-          ),
-        )
-        .limit(1);
+          eq(wishlistItems.productId, input.productId),
+        ),
+      )
+      .limit(1);
 
-    const existing =
-      existingResult[0];
+    const existing = existingResult[0];
 
     // ========================================================
     // ALREADY IN WISHLIST
@@ -265,8 +186,7 @@ export async function POST(
 
         data: existing,
 
-        message:
-          "Product is already in your wishlist",
+        message: "Product is already in your wishlist",
       });
     }
 
@@ -274,23 +194,17 @@ export async function POST(
     // ADD TO WISHLIST
     // ========================================================
 
-    const [item] =
-      await db
-        .insert(wishlistItems)
-        .values({
-          userId:
-            user.id,
+    const [item] = await db
+      .insert(wishlistItems)
+      .values({
+        userId: user.id,
 
-          productId:
-            input.productId,
-        })
-        .returning();
+        productId: input.productId,
+      })
+      .returning();
 
     if (!item) {
-      throw new ApiError(
-        "Unable to add product to wishlist",
-        500,
-      );
+      throw new ApiError("Unable to add product to wishlist", 500);
     }
 
     // ========================================================
@@ -303,18 +217,14 @@ export async function POST(
 
         data: item,
 
-        message:
-          "Product added to wishlist",
+        message: "Product added to wishlist",
       },
       {
         status: 201,
       },
     );
   } catch (error) {
-    console.error(
-      "POST /api/wishlist error:",
-      error,
-    );
+    console.error("POST /api/wishlist error:", error);
 
     return handleApiError(error);
   }

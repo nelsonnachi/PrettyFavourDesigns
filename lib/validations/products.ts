@@ -14,11 +14,6 @@ export const productStatusSchema = z.enum([
 // ============================================================
 // PRODUCT IMAGE INPUT
 // ============================================================
-//
-// fileKey is used when uploading a NEW image.
-// id is used when keeping an EXISTING image during update.
-//
-// ============================================================
 
 export const productImageInputSchema = z.object({
   id: z.string().uuid("Invalid image ID").optional(),
@@ -32,14 +27,6 @@ export const productImageInputSchema = z.object({
 
 // ============================================================
 // PRODUCT VARIANT
-// ============================================================
-//
-// A variant represents ONE COLOR.
-//
-// No price.
-// No image.
-// No attributes.
-//
 // ============================================================
 
 export const productVariantSchema = z.object({
@@ -64,113 +51,130 @@ export const productVariantSchema = z.object({
 });
 
 // ============================================================
+// PRODUCT BASE OBJECT
+// ============================================================
+//
+// IMPORTANT:
+// Keep this as a plain z.object().
+//
+// We use this object to create updateProductSchema.partial().
+//
+// Do NOT put .refine() directly on this object.
+//
+
+const productBaseSchema = z.object({
+  // ==========================================================
+  // BASIC INFORMATION
+  // ==========================================================
+
+  name: z
+    .string()
+    .trim()
+    .min(2, "Product name must be at least 2 characters")
+    .max(200, "Product name is too long"),
+
+  slug: z
+    .string()
+    .trim()
+    .min(2, "Product slug is required")
+    .max(250, "Product slug is too long")
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Slug can only contain lowercase letters, numbers and hyphens"
+    ),
+
+  sku: z
+    .string()
+    .trim()
+    .min(1, "Product SKU is required")
+    .max(100, "Product SKU is too long"),
+
+  description: z
+    .string()
+    .trim()
+    .min(10, "Product description must be at least 10 characters")
+    .max(10000, "Product description is too long"),
+
+  categoryId: z.string().uuid("Invalid category ID"),
+
+  // ==========================================================
+  // PRICING
+  // ==========================================================
+
+  price: z.number().nonnegative("Price cannot be negative"),
+
+  compareAtPrice: z
+    .number()
+    .nonnegative("Compare-at price cannot be negative")
+    .nullable()
+    .optional(),
+
+  costPrice: z
+    .number()
+    .nonnegative("Cost price cannot be negative")
+    .nullable()
+    .optional(),
+
+  // ==========================================================
+  // STATUS
+  // ==========================================================
+
+  status: productStatusSchema.optional().default("draft"),
+
+  // ==========================================================
+  // LABELS
+  // ==========================================================
+
+  isFeatured: z.boolean().optional().default(false),
+
+  isNewArrival: z.boolean().optional().default(false),
+
+  isBestSeller: z.boolean().optional().default(false),
+
+  // ==========================================================
+  // SEO
+  // ==========================================================
+
+  metaTitle: z
+    .string()
+    .trim()
+    .max(200, "Meta title is too long")
+    .nullable()
+    .optional(),
+
+  metaDescription: z
+    .string()
+    .trim()
+    .max(500, "Meta description is too long")
+    .nullable()
+    .optional(),
+
+  // ==========================================================
+  // IMAGES
+  // ==========================================================
+
+  images: z
+    .array(productImageInputSchema)
+    .min(1, "At least one product image is required"),
+
+  // ==========================================================
+  // COLORS / VARIANTS
+  // ==========================================================
+
+  variants: z
+    .array(productVariantSchema)
+    .min(1, "A product must have at least one color"),
+});
+
+// ============================================================
 // CREATE PRODUCT
 // ============================================================
+//
+// Now we add the cross-field validation here.
+//
+// ============================================================
 
-export const createProductSchema = z
-  .object({
-    // ========================================================
-    // BASIC INFORMATION
-    // ========================================================
-
-    name: z
-      .string()
-      .trim()
-      .min(2, "Product name must be at least 2 characters")
-      .max(200, "Product name is too long"),
-
-    slug: z
-      .string()
-      .trim()
-      .min(2, "Product slug is required")
-      .max(250, "Product slug is too long")
-      .regex(
-        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-        "Slug can only contain lowercase letters, numbers and hyphens"
-      ),
-
-    sku: z
-      .string()
-      .trim()
-      .min(1, "Product SKU is required")
-      .max(100, "Product SKU is too long"),
-
-    description: z
-      .string()
-      .trim()
-      .min(10, "Product description must be at least 10 characters")
-      .max(10000, "Product description is too long"),
-
-    categoryId: z.string().uuid("Invalid category ID"),
-
-    // ========================================================
-    // PRICING
-    // ========================================================
-
-    price: z.number().nonnegative("Price cannot be negative"),
-
-    compareAtPrice: z
-      .number()
-      .nonnegative("Compare-at price cannot be negative")
-      .nullable()
-      .optional(),
-
-    costPrice: z
-      .number()
-      .nonnegative("Cost price cannot be negative")
-      .nullable()
-      .optional(),
-
-    // ========================================================
-    // STATUS
-    // ========================================================
-
-    status: productStatusSchema.optional().default("draft"),
-
-    // ========================================================
-    // LABELS
-    // ========================================================
-
-    isFeatured: z.boolean().optional().default(false),
-
-    isNewArrival: z.boolean().optional().default(false),
-
-    isBestSeller: z.boolean().optional().default(false),
-
-    // ========================================================
-    // SEO
-    // ========================================================
-
-    metaTitle: z
-      .string()
-      .trim()
-      .max(200, "Meta title is too long")
-      .nullable()
-      .optional(),
-
-    metaDescription: z
-      .string()
-      .trim()
-      .max(500, "Meta description is too long")
-      .nullable()
-      .optional(),
-
-    // ========================================================
-    // IMAGES
-    // ========================================================
-
-    images: z
-      .array(productImageInputSchema)
-      .min(1, "At least one product image is required"),
-
-    // ========================================================
-    // COLORS
-    // ========================================================
-
-    variants: z
-      .array(productVariantSchema)
-      .min(1, "A product must have at least one color"),
-  })
+export const createProductSchema = productBaseSchema
 
   // ==========================================================
   // COMPARE PRICE
@@ -244,23 +248,25 @@ export const createProductSchema = z
 // ============================================================
 // UPDATE PRODUCT
 // ============================================================
+//
+// IMPORTANT:
+// Use the plain base object here, NOT createProductSchema.
+//
+// This avoids the Zod .partial() + .refine() error.
+//
 
+export const updateProductSchema = productBaseSchema.partial().extend({
+  removedImageIds: z
+    .array(z.string().uuid("Invalid image ID"))
+    .optional()
+    .default([]),
 
-export const updateProductSchema = z.intersection(
-  createProductSchema.partial(),
+  removedVariantIds: z
+    .array(z.string().uuid("Invalid variant ID"))
+    .optional()
+    .default([]),
+});
 
-  z.object({
-    removedImageIds: z
-      .array(z.string().uuid("Invalid image ID"))
-      .optional()
-      .default([]),
-
-    removedVariantIds: z
-      .array(z.string().uuid("Invalid variant ID"))
-      .optional()
-      .default([]),
-  }),
-);
 // ============================================================
 // PRODUCT PARAMS
 // ============================================================
@@ -327,6 +333,7 @@ export const productFiltersSchema = z
     },
     {
       message: "Maximum price must be greater than or equal to minimum price",
+
       path: ["maxPrice"],
     }
   );

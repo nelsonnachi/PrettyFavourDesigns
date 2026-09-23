@@ -1,21 +1,15 @@
 import { NextRequest } from "next/server";
 
-import { eq } from "drizzle-orm";
 
 import { contactMessages } from "@/db/schema";
 
 import { db } from "@/db/drizzle";
 
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 
 import { getOptionalUser } from "@/lib/APIs/auth";
 
-import {
-  createContactMessageSchema,
-} from "@/lib/validations";
+import { createContactMessageSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 
@@ -47,8 +41,7 @@ export async function POST(req: NextRequest) {
     // VALIDATE
     // ========================================================
 
-    const input =
-      createContactMessageSchema.parse(body);
+    const input = createContactMessageSchema.parse(body);
 
     // ========================================================
     // CREATE CONTACT MESSAGE
@@ -63,11 +56,9 @@ export async function POST(req: NextRequest) {
 
         email: input.email,
 
-        phone:
-          input.phone ?? null,
+        phone: input.phone ?? null,
 
-        subject:
-          input.subject ?? null,
+        subject: input.subject ?? null,
 
         message: input.message,
 
@@ -86,15 +77,11 @@ export async function POST(req: NextRequest) {
 
         message: contactMessages.message,
 
-        createdAt:
-          contactMessages.createdAt,
+        createdAt: contactMessages.createdAt,
       });
 
     if (!message) {
-      throw new ApiError(
-        "Failed to send contact message",
-        500,
-      );
+      throw new ApiError("Failed to send contact message", 500);
     }
 
     // ========================================================
@@ -107,18 +94,14 @@ export async function POST(req: NextRequest) {
 
         data: message,
 
-        message:
-          "Your message has been sent successfully",
+        message: "Your message has been sent successfully",
       },
       {
         status: 201,
       },
     );
   } catch (error) {
-    console.error(
-      "POST /api/contact error:",
-      error,
-    );
+    console.error("POST /api/contact error:", error);
 
     return handleApiError(error);
   }

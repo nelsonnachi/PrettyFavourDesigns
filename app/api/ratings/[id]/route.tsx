@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { products, ratings } from "@/db/schema";
 
@@ -31,37 +31,48 @@ interface RouteContext {
 export async function PATCH(req: NextRequest, context: RouteContext) {
   try {
     // ========================================================
-    // REQUIRE USER
+    // 1. REQUIRE USER
     // ========================================================
 
     const user = await requireUser();
 
     // ========================================================
-    // PARAMS
+    // 2. GET PARAMS
     // ========================================================
 
-    const { id } = await context.params;
+    const params = await context.params;
 
-    const params = ratingIdParamSchema.parse({
-      id,
-    });
+    const { id } = ratingIdParamSchema.parse(params);
 
     // ========================================================
-    // FIND RATING
+    // 3. FIND RATING
     // ========================================================
 
     const existingRating = await db.query.ratings.findFirst({
       where: {
-        id: params.id,
+        id,
+      },
+
+      columns: {
+        id: true,
+        productId: true,
+        userId: true,
+        rating: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
+
+    // ========================================================
+    // 4. MAKE SURE RATING EXISTS
+    // ========================================================
 
     if (!existingRating) {
       throw new ApiError("Rating not found", 404);
     }
 
     // ========================================================
-    // MAKE SURE USER OWNS RATING
+    // 5. MAKE SURE USER OWNS RATING
     // ========================================================
 
     if (existingRating.userId !== user.id) {
@@ -69,19 +80,19 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     }
 
     // ========================================================
-    // BODY
+    // 6. READ BODY
     // ========================================================
 
     const body = await req.json();
 
     // ========================================================
-    // VALIDATE
+    // 7. VALIDATE BODY
     // ========================================================
 
     const input = updateRatingSchema.parse(body);
 
     // ========================================================
-    // UPDATE RATING
+    // 8. UPDATE RATING
     // ========================================================
 
     const [updatedRating] = await db
@@ -91,40 +102,55 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 
         updatedAt: new Date(),
       })
-      .where(eq(ratings.id, params.id))
+      .where(eq(ratings.id, id))
       .returning();
+
+    // ========================================================
+    // 9. MAKE SURE UPDATE SUCCEEDED
+    // ========================================================
 
     if (!updatedRating) {
       throw new ApiError("Rating update failed", 500);
     }
 
     // ========================================================
-    // RECALCULATE PRODUCT RATING
+    // 10. GET ALL PRODUCT RATINGS
     // ========================================================
 
-    const ratingStats = await db
-      .select({
-        average: sql<string>`AVG(${ratings.rating})`,
+    const productRatings = await db.query.ratings.findMany({
+      where: {
+        productId: existingRating.productId,
+      },
 
-        count: sql<number>`COUNT(${ratings.id})`,
-      })
-      .from(ratings)
-      .where(eq(ratings.productId, existingRating.productId));
-
-    const average = Number(ratingStats[0]?.average ?? 0);
-
-    const count = Number(ratingStats[0]?.count ?? 0);
+      columns: {
+        rating: true,
+      },
+    });
 
     // ========================================================
-    // UPDATE PRODUCT
+    // 11. RECALCULATE SUMMARY
+    // ========================================================
+
+    let totalRating = 0;
+
+    for (const item of productRatings) {
+      totalRating += item.rating;
+    }
+
+    const ratingCount = productRatings.length;
+
+    const averageRating = ratingCount > 0 ? totalRating / ratingCount : 0;
+
+    // ========================================================
+    // 12. UPDATE PRODUCT SUMMARY
     // ========================================================
 
     await db
       .update(products)
       .set({
-        averageRating: average.toFixed(2),
+        averageRating: averageRating.toFixed(2),
 
-        ratingCount: count,
+        ratingCount,
 
         updatedAt: new Date(),
       })
@@ -155,37 +181,45 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
     // ========================================================
-    // REQUIRE USER
+    // 1. REQUIRE USER
     // ========================================================
 
     const user = await requireUser();
 
     // ========================================================
-    // PARAMS
+    // 2. GET PARAMS
     // ========================================================
 
-    const { id } = await context.params;
+    const params = await context.params;
 
-    const params = ratingIdParamSchema.parse({
-      id,
-    });
+    const { id } = ratingIdParamSchema.parse(params);
 
     // ========================================================
-    // FIND RATING
+    // 3. FIND RATING
     // ========================================================
 
     const existingRating = await db.query.ratings.findFirst({
       where: {
-        id: params.id,
+        id,
+      },
+
+      columns: {
+        id: true,
+        productId: true,
+        userId: true,
       },
     });
+
+    // ========================================================
+    // 4. MAKE SURE RATING EXISTS
+    // ========================================================
 
     if (!existingRating) {
       throw new ApiError("Rating not found", 404);
     }
 
     // ========================================================
-    // MAKE SURE USER OWNS RATING
+    // 5. MAKE SURE USER OWNS RATING
     // ========================================================
 
     if (existingRating.userId !== user.id) {
@@ -193,38 +227,62 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     }
 
     // ========================================================
-    // DELETE RATING
+    // 6. DELETE RATING
     // ========================================================
 
-    await db.delete(ratings).where(eq(ratings.id, params.id));
+    const [deletedRating] = await db
+      .delete(ratings)
+      .where(eq(ratings.id, id))
+      .returning({
+        id: ratings.id,
+      });
 
     // ========================================================
-    // RECALCULATE PRODUCT RATING
+    // 7. MAKE SURE DELETE SUCCEEDED
     // ========================================================
 
-    const ratingStats = await db
-      .select({
-        average: sql<string>`AVG(${ratings.rating})`,
-
-        count: sql<number>`COUNT(${ratings.id})`,
-      })
-      .from(ratings)
-      .where(eq(ratings.productId, existingRating.productId));
-
-    const average = Number(ratingStats[0]?.average ?? 0);
-
-    const count = Number(ratingStats[0]?.count ?? 0);
+    if (!deletedRating) {
+      throw new ApiError("Rating deletion failed", 500);
+    }
 
     // ========================================================
-    // UPDATE PRODUCT
+    // 8. GET REMAINING RATINGS
+    // ========================================================
+
+    const productRatings = await db.query.ratings.findMany({
+      where: {
+        productId: existingRating.productId,
+      },
+
+      columns: {
+        rating: true,
+      },
+    });
+
+    // ========================================================
+    // 9. RECALCULATE SUMMARY
+    // ========================================================
+
+    let totalRating = 0;
+
+    for (const item of productRatings) {
+      totalRating += item.rating;
+    }
+
+    const ratingCount = productRatings.length;
+
+    const averageRating = ratingCount > 0 ? totalRating / ratingCount : 0;
+
+    // ========================================================
+    // 10. UPDATE PRODUCT SUMMARY
     // ========================================================
 
     await db
       .update(products)
       .set({
-        averageRating: average.toFixed(2),
+        averageRating: averageRating.toFixed(2),
 
-        ratingCount: count,
+        ratingCount,
 
         updatedAt: new Date(),
       })

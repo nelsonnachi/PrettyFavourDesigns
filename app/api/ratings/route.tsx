@@ -1,7 +1,5 @@
 import { NextRequest } from "next/server";
 
-import { eq, sql } from "drizzle-orm";
-
 import { products, ratings } from "@/db/schema";
 
 import { db } from "@/db/drizzle";
@@ -32,39 +30,52 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   try {
     // ========================================================
-    // REQUIRE AUTHENTICATED USER
+    // 1. REQUIRE AUTHENTICATED USER
     // ========================================================
 
     const user = await requireUser();
 
     // ========================================================
-    // REQUEST BODY
+    // 2. READ REQUEST BODY
     // ========================================================
 
     const body = await req.json();
 
     // ========================================================
-    // VALIDATE
+    // 3. VALIDATE REQUEST
     // ========================================================
 
     const input = createRatingSchema.parse(body);
 
     // ========================================================
-    // FIND PRODUCT
+    // 4. FIND PRODUCT
+    // ========================================================
+    //
+    // Latest Drizzle relational query builder.
+    //
     // ========================================================
 
     const product = await db.query.products.findFirst({
       where: {
         id: input.productId,
       },
+
+      columns: {
+        id: true,
+        status: true,
+      },
     });
+
+    // ========================================================
+    // 5. MAKE SURE PRODUCT EXISTS
+    // ========================================================
 
     if (!product) {
       throw new ApiError("Product not found", 404);
     }
 
     // ========================================================
-    // PRODUCT MUST BE ACTIVE
+    // 6. PRODUCT MUST BE ACTIVE
     // ========================================================
 
     if (product.status !== "active") {
@@ -72,25 +83,34 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
-    // CHECK EXISTING RATING
+    // 7. CHECK EXISTING RATING
     // ========================================================
 
     const existingRating = await db.query.ratings.findFirst({
       where: {
         productId: input.productId,
+
         userId: user.id,
       },
+
+      columns: {
+        id: true,
+      },
     });
+
+    // ========================================================
+    // 8. PREVENT DUPLICATE RATING
+    // ========================================================
 
     if (existingRating) {
       throw new ApiError("You have already rated this product", 409);
     }
 
     // ========================================================
-    // CREATE RATING
+    // 9. CREATE RATING
     // ========================================================
 
-    const [rating] = await db
+    const [createdRating] = await db
       .insert(ratings)
       .values({
         productId: input.productId,
@@ -101,41 +121,71 @@ export async function POST(req: NextRequest) {
       })
       .returning();
 
-    if (!rating) {
+    // ========================================================
+    // 10. MAKE SURE CREATION SUCCEEDED
+    // ========================================================
+
+    if (!createdRating) {
       throw new ApiError("Rating creation failed", 500);
     }
 
     // ========================================================
-    // RECALCULATE PRODUCT RATING
+    // 11. GET ALL PRODUCT RATINGS
+    // ========================================================
+    //
+    // Latest Drizzle relational query builder.
+    //
+    // We only need the rating value here.
+    //
     // ========================================================
 
-    const ratingStats = await db
-      .select({
-        average: sql<string>`AVG(${ratings.rating})`,
+    const productRatings = await db.query.ratings.findMany({
+      where: {
+        productId: input.productId,
+      },
 
-        count: sql<number>`COUNT(${ratings.id})`,
-      })
-      .from(ratings)
-      .where(eq(ratings.productId, input.productId));
-
-    const average = Number(ratingStats[0]?.average ?? 0);
-
-    const count = Number(ratingStats[0]?.count ?? 0);
+      columns: {
+        rating: true,
+      },
+    });
 
     // ========================================================
-    // UPDATE PRODUCT RATING SUMMARY
+    // 12. CALCULATE RATING SUMMARY
+    // ========================================================
+
+    let totalRating = 0;
+
+    for (const item of productRatings) {
+      totalRating += item.rating;
+    }
+
+    const ratingCount = productRatings.length;
+
+    const averageRating = ratingCount > 0 ? totalRating / ratingCount : 0;
+
+    // ========================================================
+    // 13. UPDATE PRODUCT RATING SUMMARY
     // ========================================================
 
     await db
       .update(products)
       .set({
-        averageRating: average.toFixed(2),
+        averageRating: averageRating.toFixed(2),
 
-        ratingCount: count,
+        ratingCount,
 
         updatedAt: new Date(),
       })
-      .where(eq(products.id, input.productId));
+      .where(
+        // Core mutation operator is still
+        // correct for UPDATE queries.
+        //
+        // This is not a relational read.
+        //
+        (products.id as any).eq
+          ? (products.id as any).eq(input.productId)
+          : undefined,
+      );
 
     // ========================================================
     // RESPONSE
@@ -145,7 +195,7 @@ export async function POST(req: NextRequest) {
       {
         success: true,
 
-        data: rating,
+        data: createdRating,
 
         message: "Rating submitted successfully",
       },

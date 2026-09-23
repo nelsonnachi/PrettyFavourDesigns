@@ -46,6 +46,7 @@ export const ratings = pgTable(
   },
 
   (table) => ({
+    // A user can only rate the same product once.
     userProductUnique: uniqueIndex(
       "ratings_user_product_unique",
     ).on(
@@ -53,10 +54,14 @@ export const ratings = pgTable(
       table.productId,
     ),
 
+    // Useful when fetching all ratings
+    // belonging to a product.
     productIdx: index(
       "ratings_product_idx",
     ).on(table.productId),
 
+    // Useful when fetching ratings
+    // belonging to a user.
     userIdx: index(
       "ratings_user_idx",
     ).on(table.userId),

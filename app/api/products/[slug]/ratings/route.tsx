@@ -1,9 +1,5 @@
 import { NextRequest } from "next/server";
 
-import { desc, eq } from "drizzle-orm";
-
-import { ratings, users } from "@/db/schema";
-
 import { db } from "@/db/drizzle";
 
 import { handleApiError } from "@/lib/APIs/api-errors";
@@ -24,38 +20,45 @@ interface RouteContext {
 // GET /api/products/[slug]/ratings
 // ============================================================
 //
-// Returns all ratings for a product using the product slug.
+// Public endpoint.
+//
+// Returns all ratings belonging to a product.
+//
+// The product is identified using its slug.
 //
 // ============================================================
 
-export async function GET(
-  req: NextRequest,
-  context: RouteContext,
-) {
+export async function GET(req: NextRequest, context: RouteContext) {
   try {
     // ========================================================
-    // PARAMS
+    // 1. GET PARAMS
     // ========================================================
 
     const { slug } = await context.params;
 
     // ========================================================
-    // FIND PRODUCT
+    // 2. FIND PRODUCT
     // ========================================================
 
     const product = await db.query.products.findFirst({
       where: {
         slug,
       },
+
       columns: {
         id: true,
       },
     });
 
+    // ========================================================
+    // 3. PRODUCT NOT FOUND
+    // ========================================================
+
     if (!product) {
       return Response.json(
         {
           success: false,
+
           message: "Product not found",
         },
         {
@@ -65,33 +68,54 @@ export async function GET(
     }
 
     // ========================================================
-    // GET RATINGS
+    // 4. GET PRODUCT RATINGS
+    // ========================================================
+    //
+    // Latest Drizzle relational query builder.
+    //
+    // No:
+    //
+    // .select()
+    // .from()
+    // .innerJoin()
+    //
+    // Instead, we use:
+    //
+    // db.query.ratings.findMany()
+    //
+    // with:
+    //
+    // user
+    //
     // ========================================================
 
-    const productRatings = await db
-      .select({
-        id: ratings.id,
+    const productRatings = await db.query.ratings.findMany({
+      where: {
+        productId: product.id,
+      },
 
-        rating: ratings.rating,
+      columns: {
+        id: true,
+        rating: true,
+        createdAt: true,
+        updatedAt: true,
+      },
 
-        createdAt: ratings.createdAt,
-
-        updatedAt: ratings.updatedAt,
-
+      with: {
         user: {
-          id: users.id,
-
-          firstName: users.firstName,
-
-          lastName: users.lastName,
-
-          imageUrl: users.imageUrl,
+          columns: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            imageUrl: true,
+          },
         },
-      })
-      .from(ratings)
-      .innerJoin(users, eq(ratings.userId, users.id))
-      .where(eq(ratings.productId, product.id))
-      .orderBy(desc(ratings.createdAt));
+      },
+
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
     // ========================================================
     // RESPONSE
@@ -103,10 +127,7 @@ export async function GET(
       data: productRatings,
     });
   } catch (error) {
-    console.error(
-      "GET /api/products/[slug]/ratings error:",
-      error,
-    );
+    console.error("GET /api/products/[slug]/ratings error:", error);
 
     return handleApiError(error);
   }

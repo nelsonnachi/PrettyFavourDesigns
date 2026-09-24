@@ -26,7 +26,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-
           message: "Paystack secret key is not configured",
         },
         {
@@ -37,11 +36,6 @@ export async function POST(request: NextRequest) {
 
     // ========================================================
     // 2. GET RAW REQUEST BODY
-    // ========================================================
-    //
-    // We must use the raw body to validate the
-    // Paystack webhook signature.
-    //
     // ========================================================
 
     const rawBody = await request.text();
@@ -56,7 +50,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-
           message: "Missing Paystack signature",
         },
         {
@@ -75,7 +68,7 @@ export async function POST(request: NextRequest) {
       .digest("hex");
 
     // ========================================================
-    // 5. COMPARE SIGNATURES SAFELY
+    // 5. SAFELY COMPARE SIGNATURES
     // ========================================================
 
     const receivedBuffer = Buffer.from(signature, "utf8");
@@ -89,7 +82,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-
           message: "Invalid Paystack signature",
         },
         {
@@ -102,28 +94,37 @@ export async function POST(request: NextRequest) {
     // 6. PARSE WEBHOOK BODY
     // ========================================================
 
-    const event = JSON.parse(rawBody);
+    let event: any;
+
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Invalid webhook payload",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
     // ========================================================
     // 7. GET TRANSACTION
     // ========================================================
 
-    const transaction = event.data;
-
-    // ========================================================
-    // 8. EVENTS WITHOUT TRANSACTION DATA
-    // ========================================================
+    const transaction = event?.data;
 
     if (!transaction) {
       return NextResponse.json({
         success: true,
-
         message: "Webhook received",
       });
     }
 
     // ========================================================
-    // 9. GET PAYMENT REFERENCE
+    // 8. GET PAYMENT REFERENCE
     // ========================================================
 
     const reference = transaction.reference;
@@ -132,7 +133,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-
           message: "Payment reference missing",
         },
         {
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 10. FIND PAYMENT
+    // 9. FIND PAYMENT
     // ========================================================
 
     const payment = await db.query.payments.findFirst({
@@ -152,23 +152,22 @@ export async function POST(request: NextRequest) {
     });
 
     // ========================================================
-    // 11. PAYMENT DOES NOT BELONG TO OUR SYSTEM
+    // 10. UNKNOWN PAYMENT
     // ========================================================
 
     if (!payment) {
-      console.error("Paystack payment not found:", reference);
+      console.warn("Paystack payment not found:", reference);
 
-      // Return 200 because this transaction
-      // does not belong to our system.
+      // Paystack should receive 200 so that it does not
+      // repeatedly retry a webhook for an unknown reference.
       return NextResponse.json({
         success: true,
-
         message: "Payment not found",
       });
     }
 
     // ========================================================
-    // 12. VALIDATE CURRENCY
+    // 11. VALIDATE CURRENCY
     // ========================================================
 
     if (transaction.currency !== payment.currency) {
@@ -177,7 +176,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-
           message: "Payment currency mismatch",
         },
         {
@@ -187,15 +185,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 13. VALIDATE AMOUNT
-    // ========================================================
-    //
-    // Database:
-    // NGN
-    //
-    // Paystack:
-    // kobo
-    //
+    // 12. VALIDATE AMOUNT
     // ========================================================
 
     const expectedAmountInKobo = Math.round(Number(payment.amount) * 100);
@@ -206,7 +196,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-
           message: "Payment amount mismatch",
         },
         {
@@ -216,18 +205,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 14. SUCCESSFUL PAYMENT
+    // 13. SUCCESSFUL PAYMENT
     // ========================================================
 
     if (event.event === "charge.success" && transaction.status === "success") {
-      // ------------------------------------------------------
-      // COMPLETE PAYMENT
-      // ------------------------------------------------------
-
       const result = await completeSuccessfulPayment({
         reference: payment.reference,
 
-        gatewayResponse: transaction.gateway_response || null,
+        gatewayResponse: transaction.gateway_response ?? null,
 
         paidAt: transaction.paid_at
           ? new Date(transaction.paid_at)
@@ -258,25 +243,64 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 15. FAILED PAYMENT
-    // ========================================================
-    //
-    // We only release the reservation for events that
-    // represent a genuinely failed transaction.
-    //
+    // 14. FAILED / ABANDONED PAYMENT
     // ========================================================
 
     if (
       event.event === "charge.failed" ||
       transaction.status === "failed" ||
-      transaction.status === "abandoned" ||
-      transaction.status === "reversed"
+      transaction.status === "abandoned"
     ) {
+      // ------------------------------------------------------
+      // ALREADY PAID
+      // ------------------------------------------------------
+
+      if (payment.status === "paid") {
+        console.warn(
+          `Received failed/abandoned Paystack event for already-paid payment: ${reference}`,
+        );
+
+        return NextResponse.json({
+          success: true,
+
+          message: "Payment was already completed; no reservation was released",
+        });
+      }
+
+      // ------------------------------------------------------
+      // ALREADY FAILED
+      // ------------------------------------------------------
+
+      if (payment.status === "failed") {
+        return NextResponse.json({
+          success: true,
+
+          message: "Failed payment already processed",
+        });
+      }
+
+      // ------------------------------------------------------
+      // ONLY PENDING PAYMENTS MAY RELEASE RESERVATION
+      // ------------------------------------------------------
+
+      if (payment.status !== "pending") {
+        return NextResponse.json({
+          success: true,
+
+          message:
+            "Payment is already in a final state; no reservation action was required",
+        });
+      }
+
+      // ------------------------------------------------------
+      // RELEASE RESERVATION
+      // ------------------------------------------------------
+
       const result = await releaseFailedPaymentReservation({
         reference: payment.reference,
 
         gatewayResponse:
-          transaction.gateway_response || transaction.message || null,
+  transaction.gateway_response ?? null,
       });
 
       return NextResponse.json({
@@ -303,11 +327,76 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 16. OTHER PAYSTACK EVENTS
+    // 15. REVERSED PAYMENT
     // ========================================================
-    //
-    // We acknowledge events that we do not need to process.
-    //
+
+    if (transaction.status === "reversed") {
+      // ------------------------------------------------------
+      // PAYMENT STILL PENDING
+      // ------------------------------------------------------
+
+      if (payment.status === "pending") {
+        const result = await releaseFailedPaymentReservation({
+          reference: payment.reference,
+
+          gatewayResponse:
+  transaction.gateway_response ??
+  "Paystack transaction reversed",
+        });
+
+        return NextResponse.json({
+          success: true,
+
+          message: result.alreadyReleased
+            ? "Reversed payment already processed"
+            : "Reversed payment processed and reserved stock released",
+
+          data: {
+            paymentId: result.payment.id,
+
+            orderId: result.order.id,
+
+            reference: result.payment.reference,
+
+            paymentStatus: result.payment.status,
+
+            orderStatus: result.order.status,
+
+            alreadyReleased: result.alreadyReleased,
+          },
+        });
+      }
+
+      // ------------------------------------------------------
+      // PAYMENT ALREADY PAID
+      // ------------------------------------------------------
+
+      if (payment.status === "paid") {
+        console.warn(
+          `Paystack reversal received after payment was completed: ${reference}`,
+        );
+
+        return NextResponse.json({
+          success: true,
+
+          message:
+            "Payment reversal received after completion; no inventory change was made",
+        });
+      }
+
+      // ------------------------------------------------------
+      // OTHER FINAL STATE
+      // ------------------------------------------------------
+
+      return NextResponse.json({
+        success: true,
+
+        message: "Reversed payment received and no further action was required",
+      });
+    }
+
+    // ========================================================
+    // 16. OTHER PAYSTACK EVENTS / STATUSES
     // ========================================================
 
     return NextResponse.json({
@@ -321,7 +410,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-
         message: "Webhook processing failed",
       },
       {

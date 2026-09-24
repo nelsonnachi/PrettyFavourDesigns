@@ -1581,6 +1581,7 @@ const orderSeedData: OrderInsert[] = [
   {
     id: orderIds.first,
     orderNumber: "SHOPPFD-10001",
+    checkoutIdempotencyKey: "seed-checkout-shoppfd-10001",
     userId: userIds.customer1,
     status: "delivered",
     paymentStatus: "paid",
@@ -1597,6 +1598,7 @@ const orderSeedData: OrderInsert[] = [
   {
     id: orderIds.second,
     orderNumber: "SHOPPFD-10002",
+    checkoutIdempotencyKey: "seed-checkout-shoppfd-10002",
     userId: userIds.customer2,
     status: "processing",
     paymentStatus: "paid",
@@ -1613,6 +1615,7 @@ const orderSeedData: OrderInsert[] = [
   {
     id: orderIds.third,
     orderNumber: "SHOPPFD-10003",
+    checkoutIdempotencyKey: "seed-checkout-shoppfd-10003",
     userId: userIds.customer3,
     status: "pending",
     paymentStatus: "pending",

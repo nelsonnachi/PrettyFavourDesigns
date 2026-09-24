@@ -11,6 +11,7 @@ import { verifyPaymentSchema } from "@/lib/validations";
 import { completeSuccessfulPayment } from "@/lib/APIs/payments/complete-payment";
 
 import { releaseFailedPaymentReservation } from "@/lib/APIs/payments/release-payment";
+import { verifyPaystackTransaction } from "@/lib/payments/paystack";
 
 // ============================================================
 // PAYSTACK VERIFY PAYMENT
@@ -37,17 +38,7 @@ export async function POST(request: NextRequest) {
     const { reference } = verifyPaymentSchema.parse(body);
 
     // ========================================================
-    // 4. GET PAYSTACK SECRET KEY
-    // ========================================================
-
-    const secretKey = process.env.PAYSTACK_SECRET_KEY;
-
-    if (!secretKey) {
-      throw new ApiError("Paystack secret key is not configured", 500);
-    }
-
-    // ========================================================
-    // 5. FIND OUR PAYMENT
+    // 4. FIND PAYMENT
     // ========================================================
 
     const payment = await db.query.payments.findFirst({
@@ -61,13 +52,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 6. VERIFY PAYMENT BELONGS TO CURRENT USER
+    // 5. FIND ORDER AND VERIFY OWNERSHIP
     // ========================================================
 
     const order = await db.query.orders.findFirst({
       where: {
         id: payment.orderId,
-
         userId: user.id,
       },
     });
@@ -77,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 7. IF ALREADY PAID
+    // 6. ALREADY PAID
     // ========================================================
 
     if (payment.status === "paid") {
@@ -88,64 +78,47 @@ export async function POST(request: NextRequest) {
 
         data: {
           paymentId: payment.id,
-
           orderId: payment.orderId,
-
           reference: payment.reference,
-
           status: payment.status,
-
           orderStatus: order.status,
-
           paymentStatus: order.paymentStatus,
+          paidAt: payment.paidAt,
+          alreadyCompleted: true,
         },
       });
     }
 
     // ========================================================
-    // 8. ASK PAYSTACK TO VERIFY TRANSACTION
+    // 7. ALREADY FAILED
     // ========================================================
 
-    const paystackResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${encodeURIComponent(
-        reference,
-      )}`,
-      {
-        method: "GET",
+    if (payment.status === "failed") {
+      return NextResponse.json({
+        success: false,
 
-        headers: {
-          Authorization: `Bearer ${secretKey}`,
+        message: "Payment has already failed",
+
+        data: {
+          paymentId: payment.id,
+          orderId: payment.orderId,
+          reference: payment.reference,
+          status: payment.status,
+          orderStatus: order.status,
+          paymentStatus: order.paymentStatus,
+          alreadyReleased: true,
         },
-
-        cache: "no-store",
-      },
-    );
-
-    // ========================================================
-    // 9. READ PAYSTACK RESPONSE
-    // ========================================================
-
-    const paystackData = await paystackResponse.json();
-
-    // ========================================================
-    // 10. MAKE SURE PAYSTACK RESPONDED SUCCESSFULLY
-    // ========================================================
-
-    if (!paystackResponse.ok || !paystackData.status) {
-      throw new ApiError(
-        paystackData.message || "Unable to verify payment with Paystack",
-        400,
-      );
-    }
-
-    const transaction = paystackData.data;
-
-    if (!transaction) {
-      throw new ApiError("Invalid Paystack transaction response", 400);
+      });
     }
 
     // ========================================================
-    // 11. VALIDATE REFERENCE
+    // 8. VERIFY TRANSACTION WITH PAYSTACK
+    // ========================================================
+
+    const transaction = await verifyPaystackTransaction(payment.reference);
+
+    // ========================================================
+    // 9. VALIDATE PAYSTACK REFERENCE
     // ========================================================
 
     if (transaction.reference !== payment.reference) {
@@ -153,7 +126,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 12. VALIDATE CURRENCY
+    // 10. VALIDATE CURRENCY
     // ========================================================
 
     if (transaction.currency !== payment.currency) {
@@ -161,15 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 13. VALIDATE AMOUNT
-    // ========================================================
-    //
-    // Database:
-    // NGN
-    //
-    // Paystack:
-    // kobo
-    //
+    // 11. VALIDATE AMOUNT
     // ========================================================
 
     const expectedAmountInKobo = Math.round(Number(payment.amount) * 100);
@@ -179,14 +144,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 14. PAYMENT SUCCESS
+    // 12. SUCCESSFUL PAYMENT
     // ========================================================
 
     if (transaction.status === "success") {
       const result = await completeSuccessfulPayment({
         reference: payment.reference,
 
-        gatewayResponse: transaction.gateway_response || null,
+        gatewayResponse: transaction.gateway_response ?? null,
 
         paidAt: transaction.paid_at
           ? new Date(transaction.paid_at)
@@ -221,25 +186,14 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 15. PAYMENT FAILED
-    // ========================================================
-    //
-    // These statuses mean the transaction did not complete.
-    //
-    // We must release the stock reservation.
-    //
+    // 13. FAILED / ABANDONED PAYMENT
     // ========================================================
 
-    if (
-      transaction.status === "failed" ||
-      transaction.status === "abandoned" ||
-      transaction.status === "reversed"
-    ) {
+    if (transaction.status === "failed" || transaction.status === "abandoned") {
       const result = await releaseFailedPaymentReservation({
         reference: payment.reference,
 
-        gatewayResponse:
-          transaction.gateway_response || transaction.message || null,
+        gatewayResponse: transaction.gateway_response ?? null,
       });
 
       return NextResponse.json({
@@ -270,7 +224,76 @@ export async function POST(request: NextRequest) {
     }
 
     // ========================================================
-    // 16. PAYMENT STILL PROCESSING
+    // 14. REVERSED PAYMENT
+    // ========================================================
+
+    if (transaction.status === "reversed") {
+      // ------------------------------------------------------
+      // PENDING PAYMENT
+      // ------------------------------------------------------
+
+      if (payment.status === "pending") {
+        const result = await releaseFailedPaymentReservation({
+          reference: payment.reference,
+
+          gatewayResponse:
+            transaction.gateway_response ?? "Paystack transaction reversed",
+        });
+
+        return NextResponse.json({
+          success: false,
+
+          message: result.alreadyReleased
+            ? "Reversed payment already processed"
+            : "Payment was reversed and reserved stock was released",
+
+          data: {
+            paymentId: result.payment.id,
+
+            orderId: result.order.id,
+
+            reference: result.payment.reference,
+
+            status: result.payment.status,
+
+            orderStatus: result.order.status,
+
+            paymentStatus: result.order.paymentStatus,
+
+            paystackStatus: transaction.status,
+
+            alreadyReleased: result.alreadyReleased,
+          },
+        });
+      }
+
+
+      // ------------------------------------------------------
+      // OTHER PAYMENT STATE
+      // ------------------------------------------------------
+
+      return NextResponse.json({
+        success: false,
+
+        message:
+          "Payment was reversed and requires no further reservation action",
+
+        data: {
+          paymentId: payment.id,
+
+          orderId: payment.orderId,
+
+          reference: payment.reference,
+
+          status: payment.status,
+
+          paystackStatus: transaction.status,
+        },
+      });
+    }
+
+    // ========================================================
+    // 15. STILL PROCESSING
     // ========================================================
 
     return NextResponse.json({

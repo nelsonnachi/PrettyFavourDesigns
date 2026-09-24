@@ -1,47 +1,37 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 
-// ============================================================
-// TYPES
-// ============================================================
-
-type PaymentState = "verifying" | "success" | "failed";
-
-type VerifyPaymentResponse = {
-  success: boolean;
-
-  message: string;
-
-  data?: {
-    paymentId: string;
-
-    orderId: string;
-
-    reference: string;
-
-    status: string;
-
-    orderStatus?: string;
-
-    paymentStatus?: string;
-
-    paidAt?: string | null;
-
-    paystackStatus?: string;
-  };
-};
+import { useVerifyPaystackPayment } from "@/lib/query/checkout/checkout-mutations";
 
 // ============================================================
-// PAYSTACK CALLBACK CONTENT
+// PAYMENT STATE
+// ============================================================
+
+type PaymentState = "verifying" | "success" | "failed" | "processing";
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const POLL_INTERVAL = 3000;
+
+const MAX_ATTEMPTS = 10;
+
+// ============================================================
+// CALLBACK CONTENT
 // ============================================================
 
 function PaystackCallbackContent() {
   const router = useRouter();
 
   const searchParams = useSearchParams();
+
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
   const [state, setState] = useState<PaymentState>("verifying");
 
@@ -50,14 +40,30 @@ function PaystackCallbackContent() {
   const [orderId, setOrderId] = useState<string | null>(null);
 
   // ==========================================================
-  // VERIFY PAYMENT
+  // REFS
+  // ==========================================================
+
+  const startedRef = useRef(false);
+
+  // ==========================================================
+  // MUTATION
+  // ==========================================================
+
+  const verifyPaymentMutation = useVerifyPaystackPayment();
+
+  // ==========================================================
+  // REFERENCE
+  // ==========================================================
+
+  const reference = searchParams.get("reference");
+
+  // ==========================================================
+  // VERIFY + POLL
   // ==========================================================
 
   useEffect(() => {
-    const reference = searchParams.get("reference");
-
     // ========================================================
-    // 1. MAKE SURE REFERENCE EXISTS
+    // NO REFERENCE
     // ========================================================
 
     if (!reference) {
@@ -69,79 +75,168 @@ function PaystackCallbackContent() {
     }
 
     // ========================================================
-    // 2. VERIFY PAYMENT
+    // PREVENT DUPLICATE START
+    // ========================================================
+
+    if (startedRef.current) {
+      return;
+    }
+
+    startedRef.current = true;
+
+    let cancelled = false;
+
+    // ========================================================
+    // VERIFY LOOP
     // ========================================================
 
     const verifyPayment = async () => {
-      try {
-        setState("verifying");
-
-        setMessage("Verifying your payment with Paystack...");
-
-        const response = await fetch("/api/payments/paystack/verify", {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          credentials: "include",
-
-          body: JSON.stringify({
-            reference,
-          }),
-        });
-
-        const result = (await response.json()) as VerifyPaymentResponse;
-
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         // ====================================================
-        // 3. PAYMENT COMPLETED
+        // COMPONENT UNMOUNTED
         // ====================================================
 
-        if (response.ok && result.success && result.data?.status === "paid") {
-          setState("success");
-
-          setMessage(result.message || "Payment completed successfully.");
-
-          setOrderId(result.data.orderId);
-
+        if (cancelled) {
           return;
         }
 
-        // ====================================================
-        // 4. PAYMENT FAILED
-        // ====================================================
+        try {
+          // ==================================================
+          // VERIFY
+          // ==================================================
 
-        if (result.data?.status === "failed") {
-          setState("failed");
+          const result = await verifyPaymentMutation.mutateAsync({
+            reference,
+          });
 
-          setMessage(result.message || "Your payment was not successful.");
+          // ==================================================
+          // SAVE ORDER ID
+          // ==================================================
 
-          if (result.data.orderId) {
+          if (result.data?.orderId) {
             setOrderId(result.data.orderId);
           }
 
+          // ==================================================
+          // PAYMENT SUCCESS
+          // ==================================================
+
+          if (result.success && result.data?.status === "paid") {
+            setState("success");
+
+            setMessage(result.message || "Payment completed successfully.");
+
+            return;
+          }
+
+          // ==================================================
+          // PAYMENT FAILED
+          // ==================================================
+
+          if (result.data?.status === "failed") {
+            setState("failed");
+
+            setMessage(result.message || "Your payment was not successful.");
+
+            return;
+          }
+
+          // ==================================================
+          // STILL PROCESSING
+          // ==================================================
+
+          setState("verifying");
+
+          setMessage(
+            `Payment is still being processed. Checking again... (${attempt}/${MAX_ATTEMPTS})`,
+          );
+
+          // ==================================================
+          // WAIT BEFORE NEXT ATTEMPT
+          // ==================================================
+
+          if (attempt < MAX_ATTEMPTS) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+          }
+        } catch (error) {
+          // ==================================================
+          // STOP IF UNMOUNTED
+          // ==================================================
+
+          if (cancelled) {
+            return;
+          }
+
+          console.error("Payment verification error:", error);
+
+          // ==================================================
+          // NETWORK / SERVER ERROR
+          // ==================================================
+          //
+          // Give the server another chance while we still have
+          // polling attempts available.
+          //
+          // ==================================================
+
+          if (attempt < MAX_ATTEMPTS) {
+            setState("verifying");
+
+            setMessage(
+              "We are having trouble confirming your payment. Retrying...",
+            );
+
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+
+            continue;
+          }
+
+          // ==================================================
+          // FINAL ERROR
+          // ==================================================
+
+          setState("failed");
+
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : "We could not verify your payment.",
+          );
+
           return;
         }
+      }
 
-        // ====================================================
-        // 5. PAYMENT STILL PROCESSING
-        // ====================================================
+      // ======================================================
+      // MAX ATTEMPTS REACHED
+      // ======================================================
+      //
+      // IMPORTANT:
+      //
+      // Do NOT call this "failed".
+      //
+      // The webhook may still complete the payment.
+      //
+      // ======================================================
 
-        setState("verifying");
+      if (!cancelled) {
+        setState("processing");
 
-        setMessage(result.message || "Your payment is still being processed.");
-      } catch (error) {
-        console.error("Payment verification error:", error);
-
-        setState("failed");
-
-        setMessage("We could not verify your payment. Please try again.");
+        setMessage(
+          "Your payment is still being confirmed. You can check your orders while we finish processing it.",
+        );
       }
     };
 
     verifyPayment();
-  }, [searchParams]);
+
+    // ========================================================
+    // CLEANUP
+    // ========================================================
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reference, verifyPaymentMutation]);
 
   // ==========================================================
   // VIEW ORDER
@@ -158,7 +253,7 @@ function PaystackCallbackContent() {
   };
 
   // ==========================================================
-  // GO TO ORDERS
+  // ORDERS
   // ==========================================================
 
   const handleContinue = () => {
@@ -205,6 +300,48 @@ function PaystackCallbackContent() {
 
           <h1 className="text-2xl font-bold text-slate-900">
             Payment Successful
+          </h1>
+
+          <p className="mt-3 text-sm leading-6 text-slate-600">{message}</p>
+
+          <div className="mt-8 flex flex-col gap-3">
+            {orderId && (
+              <button
+                type="button"
+                onClick={handleViewOrder}
+                className="w-full rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                View Order
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleContinue}
+              className="w-full rounded-lg border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Go to My Orders
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // ==========================================================
+  // STILL PROCESSING
+  // ==========================================================
+
+  if (state === "processing") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-blue-50">
+            <span className="text-3xl text-blue-600">…</span>
+          </div>
+
+          <h1 className="text-2xl font-bold text-slate-900">
+            Payment Processing
           </h1>
 
           <p className="mt-3 text-sm leading-6 text-slate-600">{message}</p>

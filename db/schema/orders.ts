@@ -6,9 +6,16 @@ import {
   decimal,
   integer,
   index,
+  check,
 } from "drizzle-orm/pg-core";
 
-import { orderStatusEnum, paymentStatusEnum, paymentMethodEnum } from "./enums";
+import { sql } from "drizzle-orm";
+
+import {
+  orderStatusEnum,
+  paymentStatusEnum,
+  paymentMethodEnum,
+} from "./enums";
 
 import { users } from "./users";
 import { products, productVariants } from "./products";
@@ -20,43 +27,42 @@ import { products, productVariants } from "./products";
 export const orders = pgTable(
   "orders",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
 
-    // ========================================================
-    // ORDER NUMBER
-    // ========================================================
+    orderNumber: text("order_number")
+      .notNull()
+      .unique(),
 
-    orderNumber: text("order_number").notNull().unique(),
+    checkoutIdempotencyKey: text(
+      "checkout_idempotency_key",
+    )
+      .notNull()
+      .unique(),
 
-    // ========================================================
-    // CUSTOMER
-    // ========================================================
+    userId: uuid("user_id").references(
+      () => users.id,
+      {
+        onDelete: "set null",
+      },
+    ),
 
-    userId: uuid("user_id").references(() => users.id, {
-      onDelete: "set null",
-    }),
-
-    // ========================================================
-    // ORDER STATUS
-    // ========================================================
-
-    status: orderStatusEnum("status").notNull().default("pending"),
-
-    // ========================================================
-    // PAYMENT
-    // ========================================================
-
-    paymentStatus: paymentStatusEnum("payment_status")
+    status: orderStatusEnum("status")
       .notNull()
       .default("pending"),
 
-    paymentMethod: paymentMethodEnum("payment_method")
+    paymentStatus: paymentStatusEnum(
+      "payment_status",
+    )
+      .notNull()
+      .default("pending"),
+
+    paymentMethod: paymentMethodEnum(
+      "payment_method",
+    )
       .notNull()
       .default("paystack"),
-
-    // ========================================================
-    // PRICING
-    // ========================================================
 
     subtotal: decimal("subtotal", {
       precision: 12,
@@ -82,15 +88,7 @@ export const orders = pgTable(
       scale: 2,
     }).notNull(),
 
-    // ========================================================
-    // NOTES
-    // ========================================================
-
     notes: text("notes"),
-
-    // ========================================================
-    // TIMESTAMPS
-    // ========================================================
 
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -106,20 +104,42 @@ export const orders = pgTable(
   },
 
   (table) => ({
-    // ========================================================
-    // INDEXES
-    // ========================================================
-
-    userIdx: index("orders_user_idx").on(table.userId),
-
-    statusIdx: index("orders_status_idx").on(table.status),
-
-    paymentStatusIdx: index("orders_payment_status_idx").on(
-      table.paymentStatus
+    userIdx: index("orders_user_idx").on(
+      table.userId,
     ),
 
-    createdAtIdx: index("orders_created_at_idx").on(table.createdAt),
-  })
+    statusIdx: index("orders_status_idx").on(
+      table.status,
+    ),
+
+    paymentStatusIdx: index(
+      "orders_payment_status_idx",
+    ).on(table.paymentStatus),
+
+    createdAtIdx: index(
+      "orders_created_at_idx",
+    ).on(table.createdAt),
+
+    subtotalPositiveCheck: check(
+      "orders_subtotal_positive_check",
+      sql`${table.subtotal} >= 0`,
+    ),
+
+    shippingFeePositiveCheck: check(
+      "orders_shipping_fee_positive_check",
+      sql`${table.shippingFee} >= 0`,
+    ),
+
+    discountPositiveCheck: check(
+      "orders_discount_positive_check",
+      sql`${table.discount} >= 0`,
+    ),
+
+    totalPositiveCheck: check(
+      "orders_total_positive_check",
+      sql`${table.total} >= 0`,
+    ),
+  }),
 );
 
 // ============================================================
@@ -129,11 +149,9 @@ export const orders = pgTable(
 export const orderItems = pgTable(
   "order_items",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-
-    // ========================================================
-    // ORDER
-    // ========================================================
+    id: uuid("id")
+      .primaryKey()
+      .defaultRandom(),
 
     orderId: uuid("order_id")
       .notNull()
@@ -141,25 +159,25 @@ export const orderItems = pgTable(
         onDelete: "cascade",
       }),
 
-    // ========================================================
-    // PRODUCT
-    // ========================================================
+    productId: uuid("product_id").references(
+      () => products.id,
+      {
+        onDelete: "set null",
+      },
+    ),
 
-    productId: uuid("product_id").references(() => products.id, {
-      onDelete: "set null",
-    }),
+    variantId: uuid("variant_id").references(
+      () => productVariants.id,
+      {
+        onDelete: "set null",
+      },
+    ),
 
-    variantId: uuid("variant_id").references(() => productVariants.id, {
-      onDelete: "set null",
-    }),
+    productName: text("product_name")
+      .notNull(),
 
-    // ========================================================
-    // PRODUCT SNAPSHOTS
-    // ========================================================
-
-    productName: text("product_name").notNull(),
-
-    productSku: text("product_sku").notNull(),
+    productSku: text("product_sku")
+      .notNull(),
 
     variantSku: text("variant_sku"),
 
@@ -167,15 +185,8 @@ export const orderItems = pgTable(
 
     productImageUrl: text("product_image_url"),
 
-    // ========================================================
-    // QUANTITY
-    // ========================================================
-
-    quantity: integer("quantity").notNull(),
-
-    // ========================================================
-    // PRICE SNAPSHOTS
-    // ========================================================
+    quantity: integer("quantity")
+      .notNull(),
 
     unitPrice: decimal("unit_price", {
       precision: 12,
@@ -187,10 +198,6 @@ export const orderItems = pgTable(
       scale: 2,
     }).notNull(),
 
-    // ========================================================
-    // TIMESTAMP
-    // ========================================================
-
     createdAt: timestamp("created_at", {
       withTimezone: true,
     })
@@ -199,14 +206,31 @@ export const orderItems = pgTable(
   },
 
   (table) => ({
-    // ========================================================
-    // INDEXES
-    // ========================================================
+    orderIdx: index(
+      "order_items_order_idx",
+    ).on(table.orderId),
 
-    orderIdx: index("order_items_order_idx").on(table.orderId),
+    productIdx: index(
+      "order_items_product_idx",
+    ).on(table.productId),
 
-    productIdx: index("order_items_product_idx").on(table.productId),
+    variantIdx: index(
+      "order_items_variant_idx",
+    ).on(table.variantId),
 
-    variantIdx: index("order_items_variant_idx").on(table.variantId),
-  })
+    quantityPositiveCheck: check(
+      "order_items_quantity_positive_check",
+      sql`${table.quantity} > 0`,
+    ),
+
+    unitPricePositiveCheck: check(
+      "order_items_unit_price_positive_check",
+      sql`${table.unitPrice} >= 0`,
+    ),
+
+    totalPricePositiveCheck: check(
+      "order_items_total_price_positive_check",
+      sql`${table.totalPrice} >= 0`,
+    ),
+  }),
 );

@@ -5,6 +5,7 @@ import {
   decimal,
   timestamp,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 import { paymentStatusEnum } from "./enums";
@@ -67,6 +68,10 @@ export const payments = pgTable(
   },
 
   (table) => ({
+    orderUniqueIdx: uniqueIndex(
+      "payments_order_unique_idx",
+    ).on(table.orderId),
+
     orderIdx: index(
       "payments_order_idx",
     ).on(table.orderId),

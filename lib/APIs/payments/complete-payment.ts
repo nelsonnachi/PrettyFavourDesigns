@@ -1,10 +1,14 @@
-// lib/APIs/payments/complete-payment.ts
-
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
 
-import { payments, orders, orderItems, productVariants } from "@/db/schema";
+import {
+  payments,
+  orders,
+  orderItems,
+  productVariants,
+  inventoryMovements,
+} from "@/db/schema";
 
 import { ApiError } from "@/lib/APIs/api-errors";
 
@@ -14,9 +18,7 @@ import { ApiError } from "@/lib/APIs/api-errors";
 
 type CompletePaymentInput = {
   reference: string;
-
   gatewayResponse?: string | null;
-
   paidAt?: Date | null;
 };
 
@@ -33,15 +35,6 @@ export async function completeSuccessfulPayment({
     // ========================================================
     // 1. FIND AND LOCK PAYMENT
     // ========================================================
-    //
-    // The row is locked for the duration of this transaction.
-    //
-    // This is important because Paystack can potentially send
-    // a webhook while the customer is also verifying payment.
-    //
-    // Only one request should be allowed to complete the payment.
-    //
-    // ========================================================
 
     const paymentResult = await tx
       .select()
@@ -53,22 +46,14 @@ export async function completeSuccessfulPayment({
     const payment = paymentResult[0];
 
     if (!payment) {
-      throw new ApiError("Payment not found", 404);
+      throw new ApiError(
+        "Payment not found",
+        404,
+      );
     }
 
     // ========================================================
-    // 2. IDEMPOTENCY CHECK
-    // ========================================================
-    //
-    // If the payment has already been completed, do not touch
-    // inventory again.
-    //
-    // This protects us from:
-    //
-    // - duplicate webhook events
-    // - verification being called multiple times
-    // - webhook + verification arriving together
-    //
+    // 2. IDEMPOTENCY
     // ========================================================
 
     if (payment.status === "paid") {
@@ -78,12 +63,13 @@ export async function completeSuccessfulPayment({
         .where(eq(orders.id, payment.orderId))
         .limit(1);
 
-      const existingOrder = existingOrderResult[0];
+      const existingOrder =
+        existingOrderResult[0];
 
       if (!existingOrder) {
         throw new ApiError(
           "Order associated with this payment was not found",
-          404
+          404,
         );
       }
 
@@ -95,18 +81,32 @@ export async function completeSuccessfulPayment({
     }
 
     // ========================================================
-    // 3. PAYMENT MUST NOT ALREADY BE REFUNDED
+    // 3. DO NOT COMPLETE REFUNDED PAYMENT
     // ========================================================
 
     if (
       payment.status === "refunded" ||
       payment.status === "partially_refunded"
     ) {
-      throw new ApiError("This payment has already been refunded", 400);
+      throw new ApiError(
+        "This payment has already been refunded",
+        400,
+      );
     }
 
     // ========================================================
-    // 4. FIND ORDER
+    // 4. PAYMENT MUST BE PENDING
+    // ========================================================
+
+    if (payment.status !== "pending") {
+      throw new ApiError(
+        `Cannot complete payment with status "${payment.status}"`,
+        400,
+      );
+    }
+
+    // ========================================================
+    // 5. FIND ORDER
     // ========================================================
 
     const orderResult = await tx
@@ -118,19 +118,25 @@ export async function completeSuccessfulPayment({
     const order = orderResult[0];
 
     if (!order) {
-      throw new ApiError("Order not found", 404);
+      throw new ApiError(
+        "Order not found",
+        404,
+      );
     }
 
     // ========================================================
-    // 5. MAKE SURE ORDER IS NOT CANCELLED
+    // 6. ORDER MUST NOT BE CANCELLED
     // ========================================================
 
     if (order.status === "cancelled") {
-      throw new ApiError("This order has already been cancelled", 400);
+      throw new ApiError(
+        "This order has already been cancelled",
+        400,
+      );
     }
 
     // ========================================================
-    // 6. GET ORDER ITEMS
+    // 7. GET ORDER ITEMS
     // ========================================================
 
     const items = await tx
@@ -139,97 +145,91 @@ export async function completeSuccessfulPayment({
       .where(eq(orderItems.orderId, order.id));
 
     if (items.length === 0) {
-      throw new ApiError("Order has no items", 400);
+      throw new ApiError(
+        "Order has no items",
+        400,
+      );
     }
 
     // ========================================================
-    // 7. PROCESS INVENTORY
-    // ========================================================
-    //
-    // SHOPPFD inventory model:
-    //
-    // Product
-    //   ├── Brown variant
-    //   ├── Black variant
-    //   └── Green variant
-    //
-    // Every order item must point to a variant.
-    //
-    // At checkout:
-    //
-    // reservedStock increases.
-    //
-    // After successful payment:
-    //
-    // stock decreases
-    // reservedStock decreases
-    //
+    // 8. PROCESS INVENTORY
     // ========================================================
 
     for (const item of items) {
-      // ======================================================
-      // 7A. VARIANT MUST EXIST ON ORDER ITEM
-      // ======================================================
-
       if (!item.variantId) {
         throw new ApiError(
           `No product variant was specified for "${item.productName}"`,
-          400
+          400,
         );
       }
 
-      // ======================================================
-      // 7B. ATOMIC INVENTORY UPDATE
-      // ======================================================
-      //
-      // We update stock and reservedStock only if BOTH are
-      // sufficient.
-      //
-      // This is safer than:
-      //
-      // SELECT
-      // then
-      // UPDATE
-      //
-      // because another request cannot sneak in between those
-      // operations.
-      //
-      // ======================================================
+      // ------------------------------------------------------
+      // REDUCE STOCK + RELEASE RESERVATION
+      // ------------------------------------------------------
 
       const updatedVariantResult = await tx
         .update(productVariants)
         .set({
-          stock: sql`${productVariants.stock} - ${item.quantity}`,
+          stock: sql`
+            ${productVariants.stock}
+            - ${item.quantity}
+          `,
 
-          reservedStock: sql`${productVariants.reservedStock} - ${item.quantity}`,
+          reservedStock: sql`
+            ${productVariants.reservedStock}
+            - ${item.quantity}
+          `,
 
           updatedAt: new Date(),
         })
         .where(
           and(
-            eq(productVariants.id, item.variantId),
+            eq(
+              productVariants.id,
+              item.variantId,
+            ),
 
-            sql`${productVariants.stock} >= ${item.quantity}`,
+            sql`
+              ${productVariants.stock}
+              >= ${item.quantity}
+            `,
 
-            sql`${productVariants.reservedStock} >= ${item.quantity}`
-          )
+            sql`
+              ${productVariants.reservedStock}
+              >= ${item.quantity}
+            `,
+          ),
         )
         .returning();
-
-      // ======================================================
-      // 7C. INVENTORY UPDATE FAILED
-      // ======================================================
 
       if (updatedVariantResult.length === 0) {
         throw new ApiError(
           `Insufficient reserved stock for "${item.productName}"`,
-          409
+          409,
         );
       }
+
+      // ------------------------------------------------------
+      // INVENTORY MOVEMENT
+      // ------------------------------------------------------
+
+      await tx
+        .insert(inventoryMovements)
+        .values({
+          variantId: item.variantId,
+
+          userId: order.userId,
+
+          orderId: order.id,
+
+          quantityChange: -item.quantity,
+
+          reason: "sale",
+        });
     }
 
     // ========================================================
-    // 8. UPDATE PAYMENT
+    // 9. UPDATE PAYMENT
     // ========================================================
 
     const paymentUpdateResult = await tx
@@ -246,14 +246,18 @@ export async function completeSuccessfulPayment({
       .where(eq(payments.id, payment.id))
       .returning();
 
-    const updatedPayment = paymentUpdateResult[0];
+    const updatedPayment =
+      paymentUpdateResult[0];
 
     if (!updatedPayment) {
-      throw new ApiError("Failed to update payment", 500);
+      throw new ApiError(
+        "Failed to update payment",
+        500,
+      );
     }
 
     // ========================================================
-    // 9. UPDATE ORDER
+    // 10. UPDATE ORDER
     // ========================================================
 
     const orderUpdateResult = await tx
@@ -268,14 +272,18 @@ export async function completeSuccessfulPayment({
       .where(eq(orders.id, order.id))
       .returning();
 
-    const updatedOrder = orderUpdateResult[0];
+    const updatedOrder =
+      orderUpdateResult[0];
 
     if (!updatedOrder) {
-      throw new ApiError("Failed to update order", 500);
+      throw new ApiError(
+        "Failed to update order",
+        500,
+      );
     }
 
     // ========================================================
-    // 10. RETURN RESULT
+    // 11. RETURN
     // ========================================================
 
     return {

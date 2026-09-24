@@ -2,14 +2,20 @@ import { NextResponse } from "next/server";
 
 import { and, eq, sql } from "drizzle-orm";
 
-import { db } from "@/db/drizzle";
 import crypto from "crypto";
 
-import { cartItems } from "@/db/schema/carts";
-import { productVariants } from "@/db/schema/products";
+import { db } from "@/db/drizzle";
+
+import { carts, cartItems } from "@/db/schema/carts";
+
+import { products, productVariants } from "@/db/schema/products";
+
 import { orders, orderItems } from "@/db/schema/orders";
+
 import { orderShippingAddresses } from "@/db/schema/order-shipping-addresses";
+
 import { addresses } from "@/db/schema/addresses";
+
 import { payments } from "@/db/schema/payments";
 
 import { requireUser } from "@/lib/APIs/auth";
@@ -19,6 +25,39 @@ import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 import { checkoutSchema } from "@/lib/validations/checkout";
 
 import { getOrCreateCart } from "@/lib/APIs/cart";
+
+// ============================================================
+// TYPES
+// ============================================================
+
+type DbError = {
+  code?: string;
+};
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function createOrderNumber() {
+  return `SHP-${Date.now()}-${crypto
+    .randomUUID()
+    .replace(/-/g, "")
+    .slice(0, 8)
+    .toUpperCase()}`;
+}
+
+function createPaymentReference(
+  paymentMethod: "paystack" | "cash_on_delivery",
+  orderNumber: string,
+) {
+  const prefix = paymentMethod === "paystack" ? "SHOPPFD" : "COD";
+
+  return `${prefix}-${orderNumber}-${crypto
+    .randomUUID()
+    .replace(/-/g, "")
+    .slice(0, 12)
+    .toUpperCase()}`;
+}
 
 // ============================================================
 // CHECKOUT
@@ -33,414 +72,598 @@ export async function POST(request: Request) {
     const user = await requireUser();
 
     // ========================================================
-    // 2. VALIDATE REQUEST
+    // 2. READ REQUEST BODY
     // ========================================================
 
     const body = await request.json();
 
+    // ========================================================
+    // 3. VALIDATE REQUEST
+    // ========================================================
+
     const data = checkoutSchema.parse(body);
 
     // ========================================================
-    // 3. GET CUSTOMER CART
+    // 4. CHECK EXISTING CHECKOUT
+    // ========================================================
+
+    const existingOrderResult = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          eq(orders.checkoutIdempotencyKey, data.idempotencyKey),
+          eq(orders.userId, user.id),
+        ),
+      )
+      .limit(1);
+
+    const existingOrder = existingOrderResult[0];
+
+    if (existingOrder) {
+      const existingPaymentResult = await db
+        .select()
+        .from(payments)
+        .where(eq(payments.orderId, existingOrder.id))
+        .limit(1);
+
+      const existingPayment = existingPaymentResult[0];
+
+      return NextResponse.json({
+        success: true,
+
+        message: "Checkout already exists",
+
+        data: {
+          order: existingOrder,
+
+          payment: existingPayment
+            ? {
+                id: existingPayment.id,
+                reference: existingPayment.reference,
+                amount: existingPayment.amount,
+                currency: existingPayment.currency,
+                status: existingPayment.status,
+              }
+            : null,
+
+          alreadyCreated: true,
+        },
+      });
+    }
+
+    // ========================================================
+    // 5. GET OR CREATE CART
     // ========================================================
 
     const cartResult = await getOrCreateCart();
 
-    const cart = cartResult.cart;
+    const cartId = cartResult.cart.id;
 
     // ========================================================
-    // 4. GET CART WITH RELATIONS
+    // 6. CREATE CHECKOUT TRANSACTION
     // ========================================================
 
-    const cartWithItems = await db.query.carts.findFirst({
-      where: {
-        id: cart.id,
-      },
+    try {
+      const checkoutResult = await db.transaction(async (tx) => {
+        const now = new Date();
 
-      with: {
-        items: {
+        // ==================================================
+        // 6A. LOCK CART
+        // ==================================================
+
+        const lockedCartResult = await tx
+          .select()
+          .from(carts)
+          .where(eq(carts.id, cartId))
+          .for("update")
+          .limit(1);
+
+        const lockedCart = lockedCartResult[0];
+
+        if (!lockedCart) {
+          throw new ApiError("Cart not found", 404);
+        }
+
+        // ==================================================
+        // 6B. READ CART ITEMS INSIDE TRANSACTION
+        // ==================================================
+
+        const cartWithItems = await tx.query.carts.findFirst({
+          where: {
+            id: lockedCart.id,
+          },
+
           with: {
-            product: {
+            items: {
               with: {
-                images: true,
-              },
-            },
+                product: {
+                  with: {
+                    images: true,
+                  },
+                },
 
-            variant: {
-              with: {
-                color: true,
+                variant: {
+                  with: {
+                    color: true,
+                  },
+                },
               },
             },
           },
-        },
-      },
-    });
+        });
 
-    // ========================================================
-    // 5. MAKE SURE CART EXISTS
-    // ========================================================
+        if (!cartWithItems) {
+          throw new ApiError("Cart not found", 404);
+        }
 
-    if (!cartWithItems) {
-      throw new ApiError("Cart not found", 404);
-    }
+        if (cartWithItems.items.length === 0) {
+          throw new ApiError("Your cart is empty", 400);
+        }
 
-    // ========================================================
-    // 6. MAKE SURE CART IS NOT EMPTY
-    // ========================================================
+        // ==================================================
+        // 6C. GET SHIPPING ADDRESS INSIDE TRANSACTION
+        // ==================================================
 
-    if (cartWithItems.items.length === 0) {
-      throw new ApiError("Your cart is empty", 400);
-    }
+        const addressResult = await tx
+          .select()
+          .from(addresses)
+          .where(
+            and(
+              eq(addresses.id, data.addressId),
+              eq(addresses.userId, user.id),
+            ),
+          )
+          .limit(1);
 
-    // ========================================================
-    // 7. VERIFY SHIPPING ADDRESS
-    // ========================================================
+        const shippingAddress = addressResult[0];
 
-    const addressResult = await db
-      .select()
-      .from(addresses)
-      .where(
-        and(eq(addresses.id, data.addressId), eq(addresses.userId, user.id)),
-      )
-      .limit(1);
+        if (!shippingAddress) {
+          throw new ApiError("Shipping address not found", 404);
+        }
 
-    const shippingAddress = addressResult[0];
+        // ==================================================
+        // 6D. VALIDATE CART + CALCULATE SUBTOTAL
+        // ==================================================
 
-    if (!shippingAddress) {
-      throw new ApiError("Shipping address not found", 404);
-    }
+        let subtotal = 0;
 
-    // ========================================================
-    // 8. CALCULATE SUBTOTAL
-    // ========================================================
+        for (const item of cartWithItems.items) {
+          // ------------------------------------------------
+          // PRODUCT
+          // ------------------------------------------------
 
-    let subtotal = 0;
+          if (!item.product) {
+            throw new ApiError("A product in your cart no longer exists", 400);
+          }
 
-    for (const item of cartWithItems.items) {
-      // Every sellable item must have a variant.
-      if (!item.variant) {
-        throw new ApiError(
-          `No variant was selected for "${item.product.name}"`,
-          400,
-        );
-      }
+          const product = item.product;
 
-      // Every variant must have a color.
-      if (!item.variant.color) {
-        throw new ApiError(
-          `No color was selected for "${item.product.name}"`,
-          400,
-        );
-      }
+          // ------------------------------------------------
+          // PRODUCT STATUS
+          // ------------------------------------------------
 
-      const price = Number(item.product.price);
+          if (product.status !== "active") {
+            throw new ApiError(`"${product.name}" is no longer available`, 400);
+          }
 
-      const quantity = item.quantity;
+          // ------------------------------------------------
+          // SOFT DELETED PRODUCT
+          // ------------------------------------------------
 
-      subtotal += price * quantity;
-    }
+          if (product.deletedAt) {
+            throw new ApiError(`"${product.name}" is no longer available`, 400);
+          }
 
-    // ========================================================
-    // 9. SHIPPING FEE
-    // ========================================================
+          // ------------------------------------------------
+          // VARIANT
+          // ------------------------------------------------
 
-    const shippingFee = 0;
+          if (!item.variant) {
+            throw new ApiError(
+              `No variant was selected for "${product.name}"`,
+              400,
+            );
+          }
 
-    // ========================================================
-    // 10. DISCOUNT
-    // ========================================================
+          const variant = item.variant;
 
-    const discount = 0;
+          // ------------------------------------------------
+          // VARIANT BELONGS TO PRODUCT
+          // ------------------------------------------------
 
-    // ========================================================
-    // 11. TOTAL
-    // ========================================================
+          if (variant.productId !== product.id) {
+            throw new ApiError(`Invalid variant for "${product.name}"`, 400);
+          }
 
-    const total = subtotal + shippingFee - discount;
+          // ------------------------------------------------
+          // COLOR
+          // ------------------------------------------------
 
-    // ========================================================
-    // 12. GENERATE ORDER NUMBER
-    // ========================================================
+          if (!variant.color) {
+            throw new ApiError(
+              `No color was selected for "${product.name}"`,
+              400,
+            );
+          }
 
-    const orderNumber = `SHP-${Date.now()}-${crypto
-      .randomUUID()
-      .slice(0, 8)
-      .toUpperCase()}`;
+          const color = variant.color;
 
-    // ========================================================
-    // 13. GENERATE PAYMENT REFERENCE
-    // ========================================================
-    //
-    // This payment is created ONCE here.
-    //
-    // The Paystack initialization endpoint will reuse
-    // this reference instead of creating another payment.
-    //
-    // ========================================================
+          // ------------------------------------------------
+          // COLOR ACTIVE
+          // ------------------------------------------------
 
-    const paymentReference = `SHOPPFD-${orderNumber}-${crypto
-      .randomUUID()
-      .replace(/-/g, "")
-      .slice(0, 12)
-      .toUpperCase()}`;
+          if (!color.isActive) {
+            throw new ApiError(
+              `The selected color for "${product.name}" is unavailable`,
+              400,
+            );
+          }
 
-    // ========================================================
-    // 14. DATABASE TRANSACTION
-    // ========================================================
+          // ------------------------------------------------
+          // QUANTITY
+          // ------------------------------------------------
 
-    const checkoutResult = await db.transaction(async (tx) => {
-      // ====================================================
-      // CREATE ORDER
-      // ====================================================
+          if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+            throw new ApiError(`Invalid quantity for "${product.name}"`, 400);
+          }
 
-      const orderResult = await tx
-        .insert(orders)
-        .values({
+          // ------------------------------------------------
+          // PRICE
+          // ------------------------------------------------
+
+          const price = Number(product.price);
+
+          if (!Number.isFinite(price) || price < 0) {
+            throw new ApiError(`Invalid price for "${product.name}"`, 500);
+          }
+
+          // ------------------------------------------------
+          // SUBTOTAL
+          // ------------------------------------------------
+
+          subtotal += price * item.quantity;
+        }
+
+        // ==================================================
+        // 6E. CALCULATE TOTAL
+        // ==================================================
+
+        const shippingFee = 0;
+
+        const discount = 0;
+
+        const total = subtotal + shippingFee - discount;
+
+        if (!Number.isFinite(total) || total <= 0) {
+          throw new ApiError("Invalid checkout total", 400);
+        }
+
+        // ==================================================
+        // 6F. CREATE IDENTIFIERS
+        // ==================================================
+
+        const orderNumber = createOrderNumber();
+
+        const paymentReference = createPaymentReference(
+          data.paymentMethod,
           orderNumber,
+        );
 
-          userId: user.id,
+        // ==================================================
+        // 6G. CREATE ORDER
+        // ==================================================
 
-          status: "pending",
+        const orderResult = await tx
+          .insert(orders)
+          .values({
+            orderNumber,
 
-          paymentStatus: "pending",
+            checkoutIdempotencyKey: data.idempotencyKey,
 
-          paymentMethod: data.paymentMethod,
+            userId: user.id,
 
-          subtotal: subtotal.toFixed(2),
+            status: "pending",
 
-          shippingFee: shippingFee.toFixed(2),
+            paymentStatus: "pending",
 
-          discount: discount.toFixed(2),
+            paymentMethod: data.paymentMethod,
 
-          total: total.toFixed(2),
+            subtotal: subtotal.toFixed(2),
 
-          notes: data.notes,
-        })
-        .returning();
+            shippingFee: shippingFee.toFixed(2),
 
-      const createdOrder = orderResult[0];
+            discount: discount.toFixed(2),
 
-      if (!createdOrder) {
-        throw new ApiError("Failed to create order", 500);
-      }
+            total: total.toFixed(2),
 
-      // ====================================================
-      // CREATE ONE PAYMENT
-      // ====================================================
+            notes: data.notes ?? null,
 
-      const paymentResult = await tx
-        .insert(payments)
-        .values({
+            createdAt: now,
+
+            updatedAt: now,
+          })
+          .returning();
+
+        const createdOrder = orderResult[0];
+
+        if (!createdOrder) {
+          throw new ApiError("Failed to create order", 500);
+        }
+
+        // ==================================================
+        // 6H. CREATE PAYMENT
+        // ==================================================
+
+        const paymentResult = await tx
+          .insert(payments)
+          .values({
+            orderId: createdOrder.id,
+
+            provider:
+              data.paymentMethod === "paystack"
+                ? "paystack"
+                : "cash_on_delivery",
+
+            reference: paymentReference,
+
+            amount: total.toFixed(2),
+
+            currency: "NGN",
+
+            status: "pending",
+
+            createdAt: now,
+
+            updatedAt: now,
+          })
+          .returning();
+
+        const createdPayment = paymentResult[0];
+
+        if (!createdPayment) {
+          throw new ApiError("Failed to create payment", 500);
+        }
+
+        // ==================================================
+        // 6I. CREATE SHIPPING SNAPSHOT
+        // ==================================================
+
+        await tx.insert(orderShippingAddresses).values({
           orderId: createdOrder.id,
 
-          provider:
-            data.paymentMethod === "paystack" ? "paystack" : "cash_on_delivery",
+          firstName: shippingAddress.firstName,
 
-          reference: paymentReference,
+          lastName: shippingAddress.lastName,
 
-          amount: total.toFixed(2),
+          phone: shippingAddress.phone,
 
-          currency: "NGN",
+          addressLine1: shippingAddress.addressLine1,
 
-          status: "pending",
-        })
-        .returning();
+          addressLine2: shippingAddress.addressLine2,
 
-      const createdPayment = paymentResult[0];
+          city: shippingAddress.city,
 
-      if (!createdPayment) {
-        throw new ApiError("Failed to create payment", 500);
-      }
+          state: shippingAddress.state,
 
-      // ====================================================
-      // CREATE SHIPPING ADDRESS SNAPSHOT
-      // ====================================================
+          country: shippingAddress.country,
 
-      await tx.insert(orderShippingAddresses).values({
-        orderId: createdOrder.id,
+          postalCode: shippingAddress.postalCode,
 
-        firstName: shippingAddress.firstName,
-
-        lastName: shippingAddress.lastName,
-
-        phone: shippingAddress.phone,
-
-        addressLine1: shippingAddress.addressLine1,
-
-        addressLine2: shippingAddress.addressLine2,
-
-        city: shippingAddress.city,
-
-        state: shippingAddress.state,
-
-        country: shippingAddress.country,
-
-        postalCode: shippingAddress.postalCode,
-      });
-
-      // ====================================================
-      // PROCESS CART ITEMS
-      // ====================================================
-
-      for (const item of cartWithItems.items) {
-        const product = item.product;
-
-        const variant = item.variant;
-
-        if (!variant) {
-          throw new ApiError(
-            `No variant was selected for "${product.name}"`,
-            400,
-          );
-        }
-
-        const color = variant.color;
-
-        if (!color) {
-          throw new ApiError(
-            `No color was selected for "${product.name}"`,
-            400,
-          );
-        }
+          createdAt: now,
+        });
 
         // ==================================================
-        // PRICE
+        // 6J. CREATE ORDER ITEMS + RESERVE STOCK
         // ==================================================
 
-        const price = Number(product.price);
+        for (const item of cartWithItems.items) {
+          const product = item.product;
 
-        const quantity = item.quantity;
+          const variant = item.variant;
 
-        const itemTotal = price * quantity;
+          if (!product || !variant) {
+            throw new ApiError("Invalid cart item", 400);
+          }
 
-        // ==================================================
-        // PRIMARY IMAGE
-        // ==================================================
+          const color = variant.color;
 
-        let productImageUrl: string | null = null;
+          if (!color) {
+            throw new ApiError(
+              `No color was selected for "${product.name}"`,
+              400,
+            );
+          }
 
-        for (const image of product.images) {
-          if (image.isPrimary) {
-            productImageUrl = image.url;
-            break;
+          const price = Number(product.price);
+
+          const quantity = item.quantity;
+
+          const itemTotal = price * quantity;
+
+          const primaryImage = product.images.find((image) => image.isPrimary);
+
+          // ----------------------------------------------
+          // CREATE ORDER ITEM
+          // ----------------------------------------------
+
+          await tx.insert(orderItems).values({
+            orderId: createdOrder.id,
+
+            productId: product.id,
+
+            variantId: variant.id,
+
+            productName: product.name,
+
+            productSku: product.sku,
+
+            variantSku: variant.sku,
+
+            colorName: color.name,
+
+            productImageUrl: primaryImage?.url ?? null,
+
+            quantity,
+
+            unitPrice: price.toFixed(2),
+
+            totalPrice: itemTotal.toFixed(2),
+
+            createdAt: now,
+          });
+
+          // ----------------------------------------------
+          // RESERVE STOCK ATOMICALLY
+          // ----------------------------------------------
+
+          const updatedVariant = await tx
+            .update(productVariants)
+            .set({
+              reservedStock: sql`
+                    ${productVariants.reservedStock}
+                    + ${quantity}
+                  `,
+
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(productVariants.id, variant.id),
+
+                sql`
+                    ${productVariants.stock}
+                    -
+                    ${productVariants.reservedStock}
+                    >= ${quantity}
+                  `,
+              ),
+            )
+            .returning();
+
+          if (updatedVariant.length === 0) {
+            throw new ApiError(
+              `${product.name} (${color.name}) does not have enough stock`,
+              409,
+            );
           }
         }
 
         // ==================================================
-        // CREATE ORDER ITEM
+        // 6K. CLEAR CART
         // ==================================================
 
-        await tx.insert(orderItems).values({
-          orderId: createdOrder.id,
-
-          productId: product.id,
-
-          variantId: variant.id,
-
-          productName: product.name,
-
-          productSku: product.sku,
-
-          variantSku: variant.sku,
-
-          colorName: color.name,
-
-          productImageUrl,
-
-          quantity,
-
-          unitPrice: price.toFixed(2),
-
-          totalPrice: itemTotal.toFixed(2),
-        });
+        await tx.delete(cartItems).where(eq(cartItems.cartId, lockedCart.id));
 
         // ==================================================
-        // RESERVE STOCK
+        // 6L. RETURN CREATED RECORDS
         // ==================================================
 
-        const updatedVariant = await tx
-          .update(productVariants)
-          .set({
-            reservedStock: sql<number>`
-              ${productVariants.reservedStock} + ${quantity}
-            `,
+        return {
+          order: createdOrder,
 
-            updatedAt: new Date(),
-          })
+          payment: createdPayment,
+        };
+      });
+
+      // ======================================================
+      // 7. SUCCESS RESPONSE
+      // ======================================================
+
+      return NextResponse.json(
+        {
+          success: true,
+
+          message: "Checkout completed successfully",
+
+          data: {
+            order: checkoutResult.order,
+
+            payment: {
+              id: checkoutResult.payment.id,
+
+              reference: checkoutResult.payment.reference,
+
+              amount: checkoutResult.payment.amount,
+
+              currency: checkoutResult.payment.currency,
+
+              status: checkoutResult.payment.status,
+            },
+
+            alreadyCreated: false,
+          },
+        },
+        {
+          status: 201,
+        },
+      );
+    } catch (error) {
+      // ======================================================
+      // 8. HANDLE IDEMPOTENCY RACE
+      // ======================================================
+
+      const dbError = error as DbError;
+
+      if (dbError.code === "23505") {
+        const existingOrderResult = await db
+          .select()
+          .from(orders)
           .where(
             and(
-              eq(productVariants.id, variant.id),
+              eq(orders.checkoutIdempotencyKey, data.idempotencyKey),
 
-              sql`
-                ${productVariants.stock}
-                -
-                ${productVariants.reservedStock}
-                >= ${quantity}
-              `,
+              eq(orders.userId, user.id),
             ),
           )
-          .returning();
+          .limit(1);
 
-        // ==================================================
-        // STOCK UNAVAILABLE
-        // ==================================================
+        const existingOrder = existingOrderResult[0];
 
-        if (updatedVariant.length === 0) {
-          throw new ApiError(
-            `${product.name} (${color.name}) does not have enough stock`,
-            409,
-          );
+        if (existingOrder) {
+          const existingPaymentResult = await db
+            .select()
+            .from(payments)
+            .where(eq(payments.orderId, existingOrder.id))
+            .limit(1);
+
+          const existingPayment = existingPaymentResult[0];
+
+          return NextResponse.json({
+            success: true,
+
+            message: "Checkout already exists",
+
+            data: {
+              order: existingOrder,
+
+              payment: existingPayment
+                ? {
+                    id: existingPayment.id,
+
+                    reference: existingPayment.reference,
+
+                    amount: existingPayment.amount,
+
+                    currency: existingPayment.currency,
+
+                    status: existingPayment.status,
+                  }
+                : null,
+
+              alreadyCreated: true,
+            },
+          });
         }
       }
 
-      // ====================================================
-      // CLEAR CART
-      // ====================================================
-
-      await tx.delete(cartItems).where(eq(cartItems.cartId, cart.id));
-
-      // ====================================================
-      // RETURN CHECKOUT RESULT
-      // ====================================================
-
-      return {
-        order: createdOrder,
-
-        payment: createdPayment,
-      };
-    });
-
-    // ========================================================
-    // 15. SUCCESS RESPONSE
-    // ========================================================
-
-    return NextResponse.json(
-      {
-        success: true,
-
-        message: "Checkout completed successfully",
-
-        data: {
-          order: checkoutResult.order,
-
-          payment: {
-            id: checkoutResult.payment.id,
-
-            reference: checkoutResult.payment.reference,
-
-            amount: checkoutResult.payment.amount,
-
-            currency: checkoutResult.payment.currency,
-
-            status: checkoutResult.payment.status,
-          },
-        },
-      },
-      {
-        status: 201,
-      },
-    );
+      throw error;
+    }
   } catch (error) {
+    // ========================================================
+    // 9. HANDLE API ERROR
+    // ========================================================
+
     return handleApiError(error);
   }
 }

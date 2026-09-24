@@ -3,24 +3,25 @@ import { z } from "zod";
 // ============================================================
 // CHECKOUT
 // ============================================================
-//
-// The customer does NOT send the shipping address itself.
-//
-// They send the ID of one of their saved addresses.
-//
-// The server will fetch the address from PostgreSQL and create
-// a permanent snapshot for the order.
-//
-// ============================================================
 
 export const checkoutSchema = z.object({
+  // ==========================================================
+  // IDEMPOTENCY KEY
+  // ==========================================================
+  //
+  // One key represents one checkout attempt.
+  //
+  idempotencyKey: z
+    .string()
+    .uuid("Invalid checkout idempotency key"),
+
   // ==========================================================
   // SHIPPING ADDRESS
   // ==========================================================
 
-  addressId: z.string().uuid(
-    "Invalid shipping address",
-  ),
+  addressId: z
+    .string()
+    .uuid("Invalid shipping address"),
 
   // ==========================================================
   // PAYMENT METHOD
@@ -32,15 +33,14 @@ export const checkoutSchema = z.object({
   ]),
 
   // ==========================================================
-  // ORDER NOTES
+  // NOTES
   // ==========================================================
 
   notes: z
     .string()
     .trim()
-    .max(
-      1000,
-      "Order notes cannot exceed 1000 characters",
-    )
+    .max(1000)
     .optional(),
 });
+
+export type CheckoutInput = z.infer<typeof checkoutSchema>;

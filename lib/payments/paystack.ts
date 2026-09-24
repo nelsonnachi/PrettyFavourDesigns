@@ -4,38 +4,27 @@
 
 type PaystackInitializeResponse = {
   status: boolean;
-
   message: string;
 
   data?: {
     authorization_url: string;
-
     access_code: string;
-
     reference: string;
   };
 };
 
 type PaystackVerifyResponse = {
   status: boolean;
-
   message: string;
 
   data?: {
     id: number;
-
     status: string;
-
     reference: string;
-
     amount: number;
-
     currency: string;
-
     paid_at: string | null;
-
     channel: string | null;
-
     gateway_response: string | null;
   };
 };
@@ -44,16 +33,14 @@ type PaystackVerifyResponse = {
 // PAYSTACK BASE URL
 // ============================================================
 
-const PAYSTACK_BASE_URL =
-  "https://api.paystack.co";
+const PAYSTACK_BASE_URL = "https://api.paystack.co";
 
 // ============================================================
 // GET PAYSTACK SECRET KEY
 // ============================================================
 
-function getPaystackSecretKey() {
-  const secretKey =
-    process.env.PAYSTACK_SECRET_KEY;
+function getPaystackSecretKey(): string {
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
 
   if (!secretKey) {
     throw new Error(
@@ -68,21 +55,20 @@ function getPaystackSecretKey() {
 // INITIALIZE TRANSACTION
 // ============================================================
 
-export async function initializePaystackTransaction(
-  data: {
-    email: string;
+export async function initializePaystackTransaction(data: {
+  email: string;
+  amount: number;
+  reference: string;
+  callbackUrl: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const secretKey = getPaystackSecretKey();
 
-    amount: number;
+  const amountInKobo = Math.round(data.amount * 100);
 
-    reference: string;
-
-    callbackUrl: string;
-
-    metadata?: Record<string, unknown>;
-  },
-) {
-  const secretKey =
-    getPaystackSecretKey();
+  if (!Number.isFinite(amountInKobo) || amountInKobo <= 0) {
+    throw new Error("Invalid payment amount");
+  }
 
   const response = await fetch(
     `${PAYSTACK_BASE_URL}/transaction/initialize`,
@@ -90,44 +76,33 @@ export async function initializePaystackTransaction(
       method: "POST",
 
       headers: {
-        Authorization:
-          `Bearer ${secretKey}`,
-
-        "Content-Type":
-          "application/json",
+        Authorization: `Bearer ${secretKey}`,
+        "Content-Type": "application/json",
       },
 
       body: JSON.stringify({
         email: data.email,
-
-        // Paystack expects NGN
-        // in kobo.
-        //
-        // ₦10,000
-        // becomes
-        // 1,000,000 kobo.
-
-        amount: Math.round(
-          data.amount * 100,
-        ),
-
+        amount: amountInKobo,
         currency: "NGN",
-
-        reference:
-          data.reference,
-
-        callback_url:
-          data.callbackUrl,
-
-        metadata:
-          data.metadata,
+        reference: data.reference,
+        callback_url: data.callbackUrl,
+        metadata: data.metadata,
       }),
+
+      cache: "no-store",
     },
   );
 
-  const result =
-    (await response.json()) as
-      PaystackInitializeResponse;
+  let result: PaystackInitializeResponse;
+
+  try {
+    result =
+      (await response.json()) as PaystackInitializeResponse;
+  } catch {
+    throw new Error(
+      "Invalid response received from Paystack",
+    );
+  }
 
   if (
     !response.ok ||
@@ -150,28 +125,39 @@ export async function initializePaystackTransaction(
 export async function verifyPaystackTransaction(
   reference: string,
 ) {
-  const secretKey =
-    getPaystackSecretKey();
+  const secretKey = getPaystackSecretKey();
+
+  const cleanReference = reference.trim();
+
+  if (!cleanReference) {
+    throw new Error("Payment reference is required");
+  }
 
   const response = await fetch(
     `${PAYSTACK_BASE_URL}/transaction/verify/${encodeURIComponent(
-      reference,
+      cleanReference,
     )}`,
     {
       method: "GET",
 
       headers: {
-        Authorization:
-          `Bearer ${secretKey}`,
+        Authorization: `Bearer ${secretKey}`,
       },
 
       cache: "no-store",
     },
   );
 
-  const result =
-    (await response.json()) as
-      PaystackVerifyResponse;
+  let result: PaystackVerifyResponse;
+
+  try {
+    result =
+      (await response.json()) as PaystackVerifyResponse;
+  } catch {
+    throw new Error(
+      "Invalid response received from Paystack",
+    );
+  }
 
   if (
     !response.ok ||

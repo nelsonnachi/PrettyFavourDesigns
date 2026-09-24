@@ -48,7 +48,7 @@ export function StorefrontHero() {
           <div className="mb-4 flex items-center gap-3 sm:mb-5 lg:mb-5">
             <span className="h-px w-6 bg-[#e85d22] sm:w-8 lg:w-9" />
 
-            <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-[#faf7f1] sm:text-[9px] sm:tracking-[0.3em] lg:text-[12px] lg:tracking-[0.32em]">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-[#faf7f1] lg:text-[#6d5141] sm:text-[9px] sm:tracking-[0.3em] lg:text-[12px] lg:tracking-[0.32em]">
               Handcrafted Bags
             </p>
           </div>
@@ -56,7 +56,7 @@ export function StorefrontHero() {
           {/* =================================================
               HEADING
           ================================================= */}
-          <h1 className="max-w-[340px] font-serif text-[60px] font-medium leading-[0.91] tracking-[-0.035em] text-[#faf7f1] sm:max-w-[470px] sm:text-[56px] md:text-[68px] lg:max-w-[580px] lg:text-[105px] lg:leading-[0.9] lg:tracking-[-0.025em]">
+          <h1 className="max-w-[340px] font-serif text-[60px] font-medium leading-[0.91] tracking-[-0.035em] text-[#faf7f1] lg:text-[#211b17] sm:max-w-[470px] sm:text-[56px] md:text-[68px] lg:max-w-[580px] lg:text-[105px] lg:leading-[0.9] lg:tracking-[-0.025em]">
             Timeless Bags
             <br />
             for Every{" "}
@@ -68,7 +68,7 @@ export function StorefrontHero() {
           {/* =================================================
               DESCRIPTION
           ================================================= */}
-          <p className="mt-5 max-w-[310px] text-[14px] leading-[1.7] text-[#faf7f1]/90 sm:mt-6 sm:max-w-[420px] sm:text-[12px] sm:leading-6 md:text-[13px] lg:mt-7 lg:max-w-[600px] lg:text-[15px]">
+          <p className="mt-5 max-w-[310px] text-[14px] leading-[1.7] text-[#faf7f1]/90 lg:text-[#413a36] sm:mt-6 sm:max-w-[420px] sm:text-[12px] sm:leading-6 md:text-[13px] lg:mt-7 lg:max-w-[600px] lg:text-[15px]">
             At SHOPPFD, we create beautifully crafted bags that blend style,
             functionality and tradition. Each piece is thoughtfully designed to
             tell a story — yours.

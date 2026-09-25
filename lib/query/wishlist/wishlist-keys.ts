@@ -13,7 +13,8 @@ export const wishlistKeys = {
   // Current user's complete wishlist
   // ----------------------------------------------------------
 
-  list: () => [...wishlistKeys.all, "list"] as const,
+  list: () =>
+    [...wishlistKeys.all, "list"] as const,
 
   // ----------------------------------------------------------
   // Check a specific product

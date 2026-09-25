@@ -25,14 +25,13 @@ import type {
 //
 // Requires authentication.
 //
-// Returns all wishlist items belonging to the current user.
-//
 // ============================================================
 
 async function getWishlist(): Promise<WishlistItem[]> {
-  const response = await apiClient<WishlistResponse>(
-    "/api/wishlist"
-  );
+  const response =
+    await apiClient<WishlistResponse>(
+      "/api/wishlist",
+    );
 
   return response.data;
 }
@@ -48,11 +47,12 @@ async function getWishlist(): Promise<WishlistItem[]> {
 // ============================================================
 
 async function getWishlistStatus(
-  productId: string
+  productId: string,
 ): Promise<WishlistCheckResponse["data"]> {
-  const response = await apiClient<WishlistCheckResponse>(
-    `/api/wishlist/${productId}`
-  );
+  const response =
+    await apiClient<WishlistCheckResponse>(
+      `/api/wishlist/${productId}`,
+    );
 
   return response.data;
 }
@@ -63,21 +63,20 @@ async function getWishlistStatus(
 //
 // POST /api/wishlist
 //
-// Requires authentication.
-//
 // ============================================================
 
 async function addToWishlist(
-  input: AddWishlistInput
+  input: AddWishlistInput,
 ): Promise<AddWishlistResponse["data"]> {
-  const response = await apiClient<AddWishlistResponse>(
-    "/api/wishlist",
-    {
-      method: "POST",
+  const response =
+    await apiClient<AddWishlistResponse>(
+      "/api/wishlist",
+      {
+        method: "POST",
 
-      body: JSON.stringify(input),
-    }
-  );
+        body: JSON.stringify(input),
+      },
+    );
 
   return response.data;
 }
@@ -88,18 +87,16 @@ async function addToWishlist(
 //
 // DELETE /api/wishlist/[productId]
 //
-// Requires authentication.
-//
 // ============================================================
 
 async function removeFromWishlist(
-  productId: string
+  productId: string,
 ): Promise<void> {
   await apiClient<DeleteWishlistResponse>(
     `/api/wishlist/${productId}`,
     {
       method: "DELETE",
-    }
+    },
   );
 }
 
@@ -120,20 +117,15 @@ export function useWishlist() {
 // ============================================================
 // CHECK PRODUCT WISHLIST STATUS
 // ============================================================
-//
-// Example:
-//
-// const { data } = useWishlistStatus(productId);
-//
-// data?.isInWishlist
-//
-// ============================================================
 
-export function useWishlistStatus(productId: string) {
+export function useWishlistStatus(
+  productId: string,
+) {
   return useQuery({
     queryKey: wishlistKeys.product(productId),
 
-    queryFn: () => getWishlistStatus(productId),
+    queryFn: () =>
+      getWishlistStatus(productId),
 
     enabled: Boolean(productId),
 
@@ -146,14 +138,18 @@ export function useWishlistStatus(productId: string) {
 // ============================================================
 
 export function useAddToWishlist() {
-  const queryClient = useQueryClient();
+  const queryClient =
+    useQueryClient();
 
   return useMutation({
     mutationFn: addToWishlist,
 
-    onSuccess: (addedItem, variables) => {
+    onSuccess: (
+      addedItem,
+      variables,
+    ) => {
       // ------------------------------------------------------
-      // Refresh the complete wishlist.
+      // Refresh complete wishlist
       // ------------------------------------------------------
 
       queryClient.invalidateQueries({
@@ -161,22 +157,26 @@ export function useAddToWishlist() {
       });
 
       // ------------------------------------------------------
-      // Update the individual product status immediately.
+      // Immediately update this product's wishlist status
       // ------------------------------------------------------
 
       queryClient.setQueryData(
-        wishlistKeys.product(variables.productId),
+        wishlistKeys.product(
+          variables.productId,
+        ),
         {
           isInWishlist: true,
 
           item: {
             id: addedItem.id,
 
-            productId: addedItem.productId,
+            productId:
+              addedItem.productId,
 
-            createdAt: addedItem.createdAt,
+            createdAt:
+              addedItem.createdAt,
           },
-        }
+        },
       );
     },
   });
@@ -187,14 +187,18 @@ export function useAddToWishlist() {
 // ============================================================
 
 export function useRemoveFromWishlist() {
-  const queryClient = useQueryClient();
+  const queryClient =
+    useQueryClient();
 
   return useMutation({
     mutationFn: removeFromWishlist,
 
-    onSuccess: (_data, productId) => {
+    onSuccess: (
+      _data,
+      productId,
+    ) => {
       // ------------------------------------------------------
-      // Refresh the complete wishlist.
+      // Refresh complete wishlist
       // ------------------------------------------------------
 
       queryClient.invalidateQueries({
@@ -202,7 +206,7 @@ export function useRemoveFromWishlist() {
       });
 
       // ------------------------------------------------------
-      // Update the individual product status immediately.
+      // Immediately update this product's wishlist status
       // ------------------------------------------------------
 
       queryClient.setQueryData(
@@ -211,7 +215,7 @@ export function useRemoveFromWishlist() {
           isInWishlist: false,
 
           item: null,
-        }
+        },
       );
     },
   });

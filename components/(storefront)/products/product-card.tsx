@@ -2,13 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
+
 import { Heart, ShoppingBag } from "lucide-react";
 
-import { PublicProduct } from "@/lib/query/products/product-types";
+import {
+  useAddToWishlist,
+  useRemoveFromWishlist,
+  useWishlistStatus,
+} from "@/lib/query/wishlist/wishlist-queries";
+
+import type { PublicProduct } from "@/lib/query/products/product-types";
+
+// ============================================================
+// TYPES
+// ============================================================
 
 type ProductCardProps = {
   product: PublicProduct;
 };
+
+// ============================================================
+// PRODUCT CARD
+// ============================================================
 
 export function ProductCard({ product }: ProductCardProps) {
   // ==========================================================
@@ -27,22 +42,73 @@ export function ProductCard({ product }: ProductCardProps) {
   const price = Number(product.price);
 
   const compareAtPrice =
-    product.compareAtPrice !== null
-      ? Number(product.compareAtPrice)
-      : null;
+    product.compareAtPrice !== null ? Number(product.compareAtPrice) : null;
 
   // ==========================================================
   // DISCOUNT
   // ==========================================================
 
-  const hasDiscount =
-    compareAtPrice !== null && compareAtPrice > price;
+  const hasDiscount = compareAtPrice !== null && compareAtPrice > price;
 
   const discountPercentage = hasDiscount
-    ? Math.round(
-        ((compareAtPrice - price) / compareAtPrice) * 100
-      )
+    ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
     : 0;
+
+  // ==========================================================
+  // WISHLIST STATUS
+  // ==========================================================
+
+  const { data: wishlistStatus, isLoading: wishlistLoading } =
+    useWishlistStatus(product.id);
+
+  // ==========================================================
+  // WISHLIST MUTATIONS
+  // ==========================================================
+
+  const addWishlist = useAddToWishlist();
+
+  const removeWishlist = useRemoveFromWishlist();
+
+  // ==========================================================
+  // CURRENT WISHLIST STATE
+  // ==========================================================
+
+  const isInWishlist = wishlistStatus?.isInWishlist ?? false;
+
+  const wishlistMutationLoading =
+    addWishlist.isPending || removeWishlist.isPending;
+
+  // ==========================================================
+  // HANDLE WISHLIST
+  // ==========================================================
+
+  function handleWishlist() {
+    // --------------------------------------------------------
+    // Prevent multiple clicks while request is running
+    // --------------------------------------------------------
+
+    if (wishlistMutationLoading) {
+      return;
+    }
+
+    // --------------------------------------------------------
+    // Remove from wishlist
+    // --------------------------------------------------------
+
+    if (isInWishlist) {
+      removeWishlist.mutate(product.id);
+
+      return;
+    }
+
+    // --------------------------------------------------------
+    // Add to wishlist
+    // --------------------------------------------------------
+
+    addWishlist.mutate({
+      productId: product.id,
+    });
+  }
 
   return (
     <article className="group flex min-w-0 flex-col">
@@ -51,17 +117,18 @@ export function ProductCard({ product }: ProductCardProps) {
       ===================================================== */}
 
       <div className="relative overflow-hidden bg-[#f3eee8]">
-        <Link
-          href={`/products/${product.slug}`}
-          className="block"
-        >
+        <Link href={`/products/${product.slug}`} className="block">
           <div className="relative aspect-[1/1.08] w-full">
             {primaryImage ? (
               <Image
                 src={primaryImage.url}
                 alt={product.name}
                 fill
-                sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw"
+                sizes="
+                  (max-width: 639px) 50vw,
+                  (max-width: 1023px) 33vw,
+                  25vw
+                "
                 className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
               />
             ) : (
@@ -94,18 +161,24 @@ export function ProductCard({ product }: ProductCardProps) {
             WISHLIST
         =================================================== */}
 
-        {product.isFeatured && (
-          <button
-            type="button"
-            aria-label={`Add ${product.name} to wishlist`}
-            className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-white/90 text-[#211b17] shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-white hover:text-[#e85d22]"
-          >
-            <Heart
-              className="size-4"
-              strokeWidth={1.5}
-            />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleWishlist}
+          disabled={wishlistLoading || wishlistMutationLoading}
+          aria-label={
+            isInWishlist
+              ? `Remove ${product.name} from wishlist`
+              : `Add ${product.name} to wishlist`
+          }
+          aria-pressed={isInWishlist}
+          className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-white/90 text-[#211b17] shadow-sm backdrop-blur-sm transition-all duration-200 hover:bg-white hover:text-[#e85d22] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Heart
+            className="size-4"
+            strokeWidth={1.5}
+            fill={isInWishlist ? "currentColor" : "none"}
+          />
+        </button>
       </div>
 
       {/* =====================================================
@@ -119,13 +192,17 @@ export function ProductCard({ product }: ProductCardProps) {
           </h3>
         </Link>
 
-        {/* DESCRIPTION */}
+        {/* ===================================================
+            DESCRIPTION
+        =================================================== */}
 
         <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-[12px] leading-5 text-[#756a60]">
           {product.description}
         </p>
 
-        {/* PRICE */}
+        {/* ===================================================
+            PRICE
+        =================================================== */}
 
         <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <span className="text-[14px] font-semibold text-[#211b17]">
@@ -139,16 +216,15 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
 
-        {/* ADD TO CART */}
+        {/* ===================================================
+            ADD TO CART
+        =================================================== */}
 
         <button
           type="button"
           className="mt-4 flex w-full items-center justify-center gap-2 border border-[#211b17] bg-[#211b17] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition-all duration-200 hover:border-[#e85d22] hover:bg-[#e85d22]"
         >
-          <ShoppingBag
-            className="size-3.5"
-            strokeWidth={1.5}
-          />
+          <ShoppingBag className="size-3.5" strokeWidth={1.5} />
 
           <span>Add to cart</span>
         </button>

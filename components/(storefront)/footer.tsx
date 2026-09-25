@@ -1,3 +1,6 @@
+"use client";
+
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import {
   FaFacebookF,
@@ -5,6 +8,8 @@ import {
   FaTiktok,
   FaXTwitter,
 } from "react-icons/fa6";
+
+import { useSubscribeToNewsletter } from "@/lib/query/newsletter/newsletter-mutations";
 
 const footerLinks = [
   {
@@ -51,9 +56,36 @@ const socialLinks = [
 ];
 
 export function StorefrontFooter() {
+  const [email, setEmail] = useState("");
+
+  const subscribeMutation = useSubscribeToNewsletter();
+
+  function handleNewsletterSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      return;
+    }
+
+    subscribeMutation.mutate(trimmedEmail, {
+      onSuccess: () => {
+        setEmail("");
+      },
+    });
+  }
+
+  const isLoading = subscribeMutation.isPending;
+
   return (
     <footer className="relative overflow-hidden bg-[#211c18] text-[#faf7f1]">
-      {/* Decorative background text */}
+      {/* =====================================================
+          DECORATIVE BACKGROUND TEXT
+      ====================================================== */}
+
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -bottom-8 left-1/2 hidden -translate-x-1/2 select-none whitespace-nowrap font-serif text-[16vw] font-semibold leading-none tracking-[-0.06em] text-white/[0.025] lg:block"
@@ -62,9 +94,15 @@ export function StorefrontFooter() {
       </div>
 
       <div className="relative mx-auto max-w-[1440px] px-5 sm:px-8 lg:px-10">
-        {/* Main Footer */}
+        {/* =====================================================
+            MAIN FOOTER
+        ====================================================== */}
+
         <div className="grid gap-14 py-16 md:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.3fr] lg:gap-16 lg:py-20">
-          {/* Brand */}
+          {/* ===================================================
+              BRAND
+          ==================================================== */}
+
           <div className="max-w-md">
             <Link
               href="/"
@@ -84,7 +122,10 @@ export function StorefrontFooter() {
               beautiful things.
             </p>
 
-            {/* Socials */}
+            {/* =================================================
+                SOCIALS
+            ================================================== */}
+
             <div className="mt-7 flex items-center gap-2.5">
               {socialLinks.map((social) => {
                 const Icon = social.icon;
@@ -105,7 +146,10 @@ export function StorefrontFooter() {
             </div>
           </div>
 
-          {/* Link Groups */}
+          {/* ===================================================
+              LINK GROUPS
+          ==================================================== */}
+
           {footerLinks.map((group) => (
             <div key={group.title}>
               <h3 className="mb-6 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#faf7f1]">
@@ -131,7 +175,10 @@ export function StorefrontFooter() {
             </div>
           ))}
 
-          {/* Newsletter */}
+          {/* ===================================================
+              NEWSLETTER
+          ==================================================== */}
+
           <div>
             <h3 className="mb-6 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#faf7f1]">
               Stay in the loop
@@ -142,32 +189,83 @@ export function StorefrontFooter() {
               inspiration.
             </p>
 
-            <form className="flex max-w-sm border-b border-white/20 pb-2">
+            <form
+              onSubmit={handleNewsletterSubmit}
+              noValidate
+              className="flex max-w-sm border-b border-white/20 pb-2"
+            >
+              <label
+                htmlFor="footer-newsletter-email"
+                className="sr-only"
+              >
+                Email address
+              </label>
+
               <input
+                id="footer-newsletter-email"
                 type="email"
+                required
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                }}
+                disabled={isLoading}
                 placeholder="Your email address"
                 aria-label="Email address"
-                className="min-w-0 flex-1 bg-transparent text-[12px] text-white outline-none placeholder:text-[#756a60]"
+                className="min-w-0 flex-1 bg-transparent text-[12px] text-white outline-none placeholder:text-[#756a60] disabled:cursor-not-allowed disabled:opacity-60"
               />
 
               <button
                 type="submit"
-                className="ml-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#faf7f1] transition-colors hover:text-[#e85d22]"
+                disabled={isLoading || !email.trim()}
+                className="ml-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#faf7f1] transition-colors hover:text-[#e85d22] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Subscribe
+                {isLoading ? "Sending..." : "Subscribe"}
               </button>
             </form>
+
+            {/* =================================================
+                SUCCESS
+            ================================================== */}
+
+            {subscribeMutation.isSuccess && (
+              <p
+                role="status"
+                className="mt-3 text-[11px] text-[#e85d22]"
+              >
+                You are now subscribed. Thank you!
+              </p>
+            )}
+
+            {/* =================================================
+                ERROR
+            ================================================== */}
+
+            {subscribeMutation.isError && (
+              <p
+                role="alert"
+                className="mt-3 text-[11px] text-red-300"
+              >
+                Something went wrong. Please try again.
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Brand Statement */}
+        {/* =====================================================
+            BRAND STATEMENT
+        ====================================================== */}
+
         <div className="border-b border-white/[0.08] py-8 text-center">
           <p className="font-serif text-[22px] italic tracking-wide text-[#d8cec4] sm:text-[28px]">
             Carry something beautiful.
           </p>
         </div>
 
-        {/* Bottom Bar */}
+        {/* =====================================================
+            BOTTOM BAR
+        ====================================================== */}
+
         <div className="flex flex-col gap-4 py-6 text-[9px] uppercase tracking-[0.12em] text-[#756a60] sm:flex-row sm:items-center sm:justify-between">
           <p>
             © {new Date().getFullYear()} SHOPPFD. All rights reserved.

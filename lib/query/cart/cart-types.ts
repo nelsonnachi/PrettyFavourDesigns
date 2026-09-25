@@ -16,6 +16,16 @@ export type CartProduct = {
 };
 
 // ------------------------------------------------------------
+// CART COLOR
+// ------------------------------------------------------------
+
+export type CartColor = {
+  id: string;
+  name: string;
+  hexCode: string | null;
+};
+
+// ------------------------------------------------------------
 // CART VARIANT
 // ------------------------------------------------------------
 
@@ -25,6 +35,8 @@ export type CartVariant = {
   stock: number;
   reservedStock: number;
   availableStock: number;
+
+  color: CartColor;
 };
 
 // ------------------------------------------------------------
@@ -48,13 +60,10 @@ export type CartItem = {
 
 export type Cart = {
   id: string;
-
   items: CartItem[];
 
   totalItems: number;
-
   subtotal: number;
-
   itemCount: number;
 };
 
@@ -64,7 +73,6 @@ export type Cart = {
 
 export type CartResponse = {
   success: true;
-
   data: Cart;
 };
 
@@ -84,7 +92,6 @@ export type AddToCartInput = {
 
 export type AddToCartResponse = {
   success: true;
-
   message: string;
 
   data: {
@@ -113,7 +120,6 @@ export type UpdateCartItemInput = {
 
 export type UpdateCartItemResponse = {
   success: true;
-
   message: string;
 
   data: {
@@ -128,12 +134,11 @@ export type UpdateCartItemResponse = {
 };
 
 // ------------------------------------------------------------
-// DELETE CART ITEM RESPONSE
+// REMOVE CART ITEM RESPONSE
 // ------------------------------------------------------------
 
 export type RemoveCartItemResponse = {
   success: true;
-
   message: string;
 };
 
@@ -143,6 +148,5 @@ export type RemoveCartItemResponse = {
 
 export type ClearCartResponse = {
   success: true;
-
   message: string;
 };

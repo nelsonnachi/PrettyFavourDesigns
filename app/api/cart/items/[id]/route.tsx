@@ -42,8 +42,16 @@ export async function PATCH(
   },
 ) {
   try {
+    // --------------------------------------------------------
+    // Get or create cart
+    // --------------------------------------------------------
+
     const { cart } =
       await getOrCreateCart();
+
+    // --------------------------------------------------------
+    // Get route params
+    // --------------------------------------------------------
 
     const params =
       await context.params;
@@ -53,13 +61,25 @@ export async function PATCH(
         params,
       );
 
+    // --------------------------------------------------------
+    // Read request body
+    // --------------------------------------------------------
+
     const body =
       await request.json();
+
+    // --------------------------------------------------------
+    // Validate quantity
+    // --------------------------------------------------------
 
     const data =
       updateCartItemSchema.parse(
         body,
       );
+
+    // --------------------------------------------------------
+    // Find cart item
+    // --------------------------------------------------------
 
     const item =
       await db.query.cartItems.findFirst({
@@ -76,6 +96,10 @@ export async function PATCH(
         },
 
         with: {
+          // --------------------------------------------------
+          // PRODUCT
+          // --------------------------------------------------
+
           product: {
             columns: {
               status: true,
@@ -83,14 +107,37 @@ export async function PATCH(
             },
           },
 
+          // --------------------------------------------------
+          // VARIANT
+          // --------------------------------------------------
+
           variant: {
             columns: {
               stock: true,
               reservedStock: true,
             },
+
+            // ------------------------------------------------
+            // COLOR
+            // ------------------------------------------------
+
+            with: {
+              color: {
+                columns: {
+                  id: true,
+                  name: true,
+                  hexCode: true,
+                  isActive: true,
+                },
+              },
+            },
           },
         },
       });
+
+    // --------------------------------------------------------
+    // Cart item must exist
+    // --------------------------------------------------------
 
     if (!item) {
       throw new ApiError(
@@ -99,12 +146,20 @@ export async function PATCH(
       );
     }
 
+    // --------------------------------------------------------
+    // Product must exist
+    // --------------------------------------------------------
+
     if (!item.product) {
       throw new ApiError(
         "Product associated with this cart item was not found",
         404,
       );
     }
+
+    // --------------------------------------------------------
+    // Variant must exist
+    // --------------------------------------------------------
 
     if (!item.variant) {
       throw new ApiError(
@@ -113,9 +168,25 @@ export async function PATCH(
       );
     }
 
+    // --------------------------------------------------------
+    // Color must exist
+    // --------------------------------------------------------
+
+    if (!item.variant.color) {
+      throw new ApiError(
+        "Product color associated with this cart item was not found",
+        404,
+      );
+    }
+
+    // --------------------------------------------------------
+    // Product availability
+    // --------------------------------------------------------
+
     if (
       item.product.deletedAt ||
-      item.product.status !== "active"
+      item.product.status !==
+        "active"
     ) {
       throw new ApiError(
         "This product is no longer available",
@@ -123,12 +194,33 @@ export async function PATCH(
       );
     }
 
+    // --------------------------------------------------------
+    // Color availability
+    // --------------------------------------------------------
+
+    if (
+      !item.variant.color.isActive
+    ) {
+      throw new ApiError(
+        "This product color is no longer available",
+        400,
+      );
+    }
+
+    // --------------------------------------------------------
+    // Calculate available stock
+    // --------------------------------------------------------
+
     const availableStock =
       Math.max(
         item.variant.stock -
           item.variant.reservedStock,
         0,
       );
+
+    // --------------------------------------------------------
+    // Check requested quantity
+    // --------------------------------------------------------
 
     if (
       data.quantity >
@@ -143,6 +235,10 @@ export async function PATCH(
         400,
       );
     }
+
+    // --------------------------------------------------------
+    // Update cart item
+    // --------------------------------------------------------
 
     const updatedResult =
       await db
@@ -160,6 +256,7 @@ export async function PATCH(
               cartItems.id,
               id,
             ),
+
             eq(
               cartItems.cartId,
               cart.id,
@@ -171,12 +268,20 @@ export async function PATCH(
     const updatedItem =
       updatedResult[0];
 
+    // --------------------------------------------------------
+    // Make sure update succeeded
+    // --------------------------------------------------------
+
     if (!updatedItem) {
       throw new ApiError(
         "Failed to update cart item",
         500,
       );
     }
+
+    // --------------------------------------------------------
+    // Update cart timestamp
+    // --------------------------------------------------------
 
     await db
       .update(carts)
@@ -190,6 +295,10 @@ export async function PATCH(
           cart.id,
         ),
       );
+
+    // --------------------------------------------------------
+    // Response
+    // --------------------------------------------------------
 
     return NextResponse.json({
       success: true,
@@ -217,8 +326,16 @@ export async function DELETE(
   },
 ) {
   try {
+    // --------------------------------------------------------
+    // Get or create cart
+    // --------------------------------------------------------
+
     const { cart } =
       await getOrCreateCart();
+
+    // --------------------------------------------------------
+    // Get route params
+    // --------------------------------------------------------
 
     const params =
       await context.params;
@@ -227,6 +344,10 @@ export async function DELETE(
       cartItemIdParamSchema.parse(
         params,
       );
+
+    // --------------------------------------------------------
+    // Delete cart item
+    // --------------------------------------------------------
 
     const result =
       await db
@@ -237,6 +358,7 @@ export async function DELETE(
               cartItems.id,
               id,
             ),
+
             eq(
               cartItems.cartId,
               cart.id,
@@ -248,12 +370,20 @@ export async function DELETE(
     const deletedItem =
       result[0];
 
+    // --------------------------------------------------------
+    // Make sure item existed
+    // --------------------------------------------------------
+
     if (!deletedItem) {
       throw new ApiError(
         "Cart item not found",
         404,
       );
     }
+
+    // --------------------------------------------------------
+    // Update cart timestamp
+    // --------------------------------------------------------
 
     await db
       .update(carts)
@@ -267,6 +397,10 @@ export async function DELETE(
           cart.id,
         ),
       );
+
+    // --------------------------------------------------------
+    // Response
+    // --------------------------------------------------------
 
     return NextResponse.json({
       success: true,

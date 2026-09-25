@@ -3,26 +3,32 @@
 import { FormEvent, useState } from "react";
 import { ArrowRight } from "lucide-react";
 
+import { useSubscribeToNewsletter } from "@/lib/query/newsletter/newsletter-mutations";
+
 export function JoinOurJourney() {
   const [email, setEmail] = useState("");
 
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
+  const subscribeMutation = useSubscribeToNewsletter();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!email) return;
+    const trimmedEmail = email.trim();
 
-    setStatus("loading");
+    if (!trimmedEmail) {
+      return;
+    }
 
-    // TODO: Replace with your actual newsletter subscription request.
-    setTimeout(() => {
-      setStatus("success");
-      setEmail("");
-    }, 600);
+    subscribeMutation.mutate(trimmedEmail, {
+      onSuccess: () => {
+        setEmail("");
+      },
+    });
   }
+
+  const isLoading = subscribeMutation.isPending;
+  const isSuccess = subscribeMutation.isSuccess;
+  const isError = subscribeMutation.isError;
 
   return (
     <section
@@ -30,7 +36,10 @@ export function JoinOurJourney() {
       className="border-t border-[#e85d22]/30 bg-[#e85d22]"
     >
       <div className="mx-auto flex max-w-360 flex-col gap-6 px-5 py-10 sm:px-8 sm:py-12 lg:flex-row lg:items-center lg:justify-between lg:gap-10 lg:px-10 lg:py-14">
-        {/* Copy */}
+        {/* =====================================================
+            COPY
+        ====================================================== */}
+
         <div className="max-w-[420px]">
           <p className="text-[9px] font-semibold uppercase tracking-[0.25em] text-white sm:text-[10px] sm:tracking-[0.3em]">
             SHOPPFD
@@ -49,13 +58,19 @@ export function JoinOurJourney() {
           </p>
         </div>
 
-        {/* Subscribe form */}
+        {/* =====================================================
+            SUBSCRIBE FORM
+        ====================================================== */}
+
         <form
           onSubmit={handleSubmit}
           noValidate
           className="flex w-full max-w-[440px] flex-col gap-3 sm:flex-row lg:w-auto"
         >
-          <label htmlFor="newsletter-email" className="sr-only">
+          <label
+            htmlFor="newsletter-email"
+            className="sr-only"
+          >
             Email address
           </label>
 
@@ -64,18 +79,21 @@ export function JoinOurJourney() {
             type="email"
             required
             value={email}
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => {
+              setEmail(event.target.value);
+            }}
             placeholder="Enter your email address"
-            className="w-full border border-[#faf7f1]/20 bg-white px-4 py-3 text-[12px] text-black placeholder:text-black outline-none transition-colors duration-200 focus:border-black sm:text-[13px]"
+            disabled={isLoading}
+            className="w-full border border-[#faf7f1]/20 bg-white px-4 py-3 text-[12px] text-black placeholder:text-black outline-none transition-colors duration-200 focus:border-black disabled:cursor-not-allowed disabled:opacity-70 sm:text-[13px]"
           />
 
           <button
             type="submit"
-            disabled={status === "loading"}
-            className="group inline-flex shrink-0 items-center justify-center gap-2 bg-black px-6 py-3 text-[9px] font-semibold uppercase tracking-[0.1em] text-white transition-all duration-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 sm:text-[10px]"
+            disabled={isLoading || !email.trim()}
+            className="group inline-flex shrink-0 items-center justify-center gap-2 bg-black px-6 py-3 text-[9px] font-semibold uppercase tracking-[0.1em] text-white transition-all duration-300 hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-60 sm:text-[10px]"
           >
             <span>
-              {status === "loading" ? "Subscribing…" : "Subscribe"}
+              {isLoading ? "Subscribing..." : "Subscribe"}
             </span>
 
             <ArrowRight
@@ -86,12 +104,29 @@ export function JoinOurJourney() {
         </form>
       </div>
 
-      {status === "success" && (
+      {/* =====================================================
+          SUCCESS MESSAGE
+      ====================================================== */}
+
+      {isSuccess && (
         <p
           role="status"
-          className="px-5 pb-6 text-[11px] text-[#e85d22] sm:px-8 lg:px-10"
+          className="px-5 pb-6 text-[11px] text-white sm:px-8 lg:px-10"
         >
           Thanks for subscribing — welcome to the journey.
+        </p>
+      )}
+
+      {/* =====================================================
+          ERROR MESSAGE
+      ====================================================== */}
+
+      {isError && (
+        <p
+          role="alert"
+          className="px-5 pb-6 text-[11px] text-white sm:px-8 lg:px-10"
+        >
+          We could not subscribe you right now. Please try again.
         </p>
       )}
     </section>

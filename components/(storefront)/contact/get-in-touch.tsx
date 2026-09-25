@@ -2,14 +2,15 @@
 
 import Image from "next/image";
 import { FormEvent, useState } from "react";
-import {
-  ArrowRight,
-  Mail,
-  MapPin,
-  Phone,
-} from "lucide-react";
+import { ArrowRight, Mail, MapPin, Phone } from "lucide-react";
+
+import { useCreateContactMessage } from "@/lib/query/contact-messages/contact-message-queries";
 
 export function GetInTouch() {
+  // ==========================================================
+  // CONTACT FORM STATE
+  // ==========================================================
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -18,16 +19,18 @@ export function GetInTouch() {
     message: "",
   });
 
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
+  // ==========================================================
+  // CONTACT MESSAGE MUTATION
+  // ==========================================================
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const createContactMessage = useCreateContactMessage();
+
+  // ==========================================================
+  // HANDLE INPUT CHANGES
+  // ==========================================================
 
   function handleChange(
-    event: React.ChangeEvent<
-      HTMLInputElement | HTMLTextAreaElement
-    >,
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) {
     const { name, value } = event.target;
 
@@ -36,48 +39,62 @@ export function GetInTouch() {
       [name]: value,
     }));
 
-    if (status === "error") {
-      setStatus("idle");
-      setErrorMessage("");
+    // Clear previous mutation error when
+    // the user starts editing the form again.
+    if (createContactMessage.isError) {
+      createContactMessage.reset();
     }
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  // ==========================================================
+  // HANDLE FORM SUBMISSION
+  // ==========================================================
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    setStatus("loading");
-    setErrorMessage("");
+    // --------------------------------------------------------
+    // Prevent submission when required fields are empty.
+    // Browser validation also handles required inputs,
+    // but this gives us an extra safeguard.
+    // --------------------------------------------------------
 
-    try {
-      /*
-       * Temporary submission.
-       *
-       * This will later be replaced with
-       * your real TanStack Query mutation
-       * connected to your contact API.
-       */
-
-      await new Promise((resolve) =>
-        setTimeout(resolve, 700),
-      );
-
-      setStatus("success");
-
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        subject: "",
-        message: "",
-      });
-    } catch {
-      setStatus("error");
-      setErrorMessage(
-        "Something went wrong. Please try again.",
-      );
+    if (
+      !formData.name.trim() ||
+      !formData.email.trim() ||
+      !formData.message.trim()
+    ) {
+      return;
     }
+
+    // --------------------------------------------------------
+    // Send the contact message to the API.
+    // --------------------------------------------------------
+
+    createContactMessage.mutate(
+      {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim() || undefined,
+        subject: formData.subject.trim() || undefined,
+        message: formData.message.trim(),
+      },
+      {
+        onSuccess: () => {
+          // --------------------------------------------------
+          // Clear the form after successful submission.
+          // --------------------------------------------------
+
+          setFormData({
+            name: "",
+            email: "",
+            phone: "",
+            subject: "",
+            message: "",
+          });
+        },
+      },
+    );
   }
 
   return (
@@ -121,9 +138,9 @@ export function GetInTouch() {
             </h1>
 
             <p className="mt-7 max-w-2xl text-sm leading-7 text-white/70 sm:text-base sm:leading-8">
-              Whether you have a question about a product,
-              need help with an order, or simply want to
-              say hello, we&apos;d love to hear from you.
+              Whether you have a question about a product, need help with an
+              order, or simply want to say hello, we&apos;d love to hear from
+              you.
             </p>
           </div>
         </div>
@@ -150,9 +167,8 @@ export function GetInTouch() {
               </h2>
 
               <p className="mt-6 max-w-md text-sm leading-7 text-[#756a60] sm:text-base sm:leading-8">
-                Our team is always happy to help with
-                questions about our products, orders,
-                deliveries, or anything else you&apos;d like
+                Our team is always happy to help with questions about our
+                products, orders, deliveries, or anything else you&apos;d like
                 to know about Shoppfd.
               </p>
 
@@ -165,10 +181,7 @@ export function GetInTouch() {
 
                 <div className="flex gap-5 border-b border-border py-6">
                   <div className="flex size-11 shrink-0 items-center justify-center border border-border">
-                    <Mail
-                      className="size-4"
-                      strokeWidth={1.5}
-                    />
+                    <Mail className="size-4" strokeWidth={1.5} />
                   </div>
 
                   <div>
@@ -189,10 +202,7 @@ export function GetInTouch() {
 
                 <div className="flex gap-5 border-b border-border py-6">
                   <div className="flex size-11 shrink-0 items-center justify-center border border-border">
-                    <Phone
-                      className="size-4"
-                      strokeWidth={1.5}
-                    />
+                    <Phone className="size-4" strokeWidth={1.5} />
                   </div>
 
                   <div>
@@ -213,10 +223,7 @@ export function GetInTouch() {
 
                 <div className="flex gap-5 py-6">
                   <div className="flex size-11 shrink-0 items-center justify-center border border-border">
-                    <MapPin
-                      className="size-4"
-                      strokeWidth={1.5}
-                    />
+                    <MapPin className="size-4" strokeWidth={1.5} />
                   </div>
 
                   <div>
@@ -241,8 +248,8 @@ export function GetInTouch() {
                 </p>
 
                 <p className="mt-3 text-sm leading-7 text-[#756a60]">
-                  Send us a message and our team will get
-                  back to you as soon as possible.
+                  Send us a message and our team will get back to you as soon as
+                  possible.
                 </p>
               </div>
             </div>
@@ -262,11 +269,7 @@ export function GetInTouch() {
                 </h2>
               </div>
 
-              <form
-                onSubmit={handleSubmit}
-                noValidate
-                className="space-y-6"
-              >
+              <form onSubmit={handleSubmit} noValidate className="space-y-6">
                 {/* ===========================================
                     NAME + EMAIL
                 ============================================ */}
@@ -399,12 +402,14 @@ export function GetInTouch() {
                     ERROR
                 ============================================ */}
 
-                {status === "error" && (
+                {createContactMessage.isError && (
                   <div
                     role="alert"
                     className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
                   >
-                    {errorMessage}
+                    {createContactMessage.error instanceof Error
+                      ? createContactMessage.error.message
+                      : "Something went wrong. Please try again."}
                   </div>
                 )}
 
@@ -412,13 +417,12 @@ export function GetInTouch() {
                     SUCCESS
                 ============================================ */}
 
-                {status === "success" && (
+                {createContactMessage.isSuccess && (
                   <div
                     role="status"
                     className="border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
                   >
-                    Thank you for reaching out. Your
-                    message has been received.
+                    Thank you for reaching out. Your message has been received.
                   </div>
                 )}
 
@@ -428,11 +432,11 @@ export function GetInTouch() {
 
                 <button
                   type="submit"
-                  disabled={status === "loading"}
+                  disabled={createContactMessage.isPending}
                   className="group flex h-14 w-full items-center justify-center gap-3 bg-[#211b17] px-6 text-xs font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#e85d22] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span>
-                    {status === "loading"
+                    {createContactMessage.isPending
                       ? "Sending..."
                       : "Send message"}
                   </span>
@@ -444,9 +448,8 @@ export function GetInTouch() {
                 </button>
 
                 <p className="text-center text-[10px] leading-5 text-[#9a9087]">
-                  By submitting this form, you agree to
-                  allow Shoppfd to contact you regarding
-                  your enquiry.
+                  By submitting this form, you agree to allow Shoppfd to contact
+                  you regarding your enquiry.
                 </p>
               </form>
             </div>
@@ -491,10 +494,9 @@ export function GetInTouch() {
               </h2>
 
               <p className="mt-7 max-w-2xl text-sm leading-7 text-white/65 sm:text-base sm:leading-8">
-                We believe building a great brand is about
-                listening, learning, and creating things that
-                genuinely make people&apos;s everyday lives
-                better.
+                We believe building a great brand is about listening, learning,
+                and creating things that genuinely make people&apos;s everyday
+                lives better.
               </p>
             </div>
           </div>

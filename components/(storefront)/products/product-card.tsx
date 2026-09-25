@@ -3,8 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Heart, ShoppingBag } from "lucide-react";
-import { PublicProduct } from "@/lib/query/products/product-types";
 
+import { PublicProduct } from "@/lib/query/products/product-types";
 
 type ProductCardProps = {
   product: PublicProduct;
@@ -39,7 +39,9 @@ export function ProductCard({ product }: ProductCardProps) {
     compareAtPrice !== null && compareAtPrice > price;
 
   const discountPercentage = hasDiscount
-    ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+    ? Math.round(
+        ((compareAtPrice - price) / compareAtPrice) * 100
+      )
     : 0;
 
   return (
@@ -59,11 +61,7 @@ export function ProductCard({ product }: ProductCardProps) {
                 src={primaryImage.url}
                 alt={product.name}
                 fill
-                sizes="
-                  (max-width: 639px) 50vw,
-                  (max-width: 1023px) 33vw,
-                  25vw
-                "
+                sizes="(max-width: 639px) 50vw, (max-width: 1023px) 33vw, 25vw"
                 className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
               />
             ) : (

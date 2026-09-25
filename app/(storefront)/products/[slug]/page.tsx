@@ -1,9 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { ProductPageClient } from "./product-page-client";
 
-import { storefrontProducts } from "@/data/storefront-products";
-
-import { ProductDetails } from "@/components/(storefront)/products/product-details";
 
 type ProductPageProps = {
   params: Promise<{
@@ -16,19 +13,10 @@ export async function generateMetadata({
 }: ProductPageProps): Promise<Metadata> {
   const { slug } = await params;
 
-  const product = storefrontProducts.find(
-    (product) => product.slug === slug
-  );
-
-  if (!product) {
-    return {
-      title: "Product Not Found | SHOPPFD",
-    };
-  }
-
   return {
-    title: `${product.name} | SHOPPFD`,
-    description: product.description,
+    title: `Product | SHOPPFD`,
+    description:
+      "Discover handcrafted bags from SHOPPFD.",
   };
 }
 
@@ -37,13 +25,5 @@ export default async function ProductPage({
 }: ProductPageProps) {
   const { slug } = await params;
 
-  const product = storefrontProducts.find(
-    (product) => product.slug === slug
-  );
-
-  if (!product) {
-    notFound();
-  }
-
-  return <ProductDetails product={product} />;
+  return <ProductPageClient slug={slug} />;
 }

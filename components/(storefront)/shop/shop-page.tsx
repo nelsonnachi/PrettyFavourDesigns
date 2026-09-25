@@ -1,9 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
-import { storefrontProducts } from "@/data/storefront-products";
 
 import { ProductCard } from "@/components/(storefront)/products/product-card";
 
@@ -13,15 +12,14 @@ import {
 } from "./shop-filters";
 
 import { ShopToolbar } from "./shop-toolbar";
-
-import { filterStorefrontProducts } from "@/data/filter-products";
+import { useProducts } from "@/lib/query/products/product-queries";
 
 const DEFAULT_FILTERS: ShopFiltersState = {
   search: "",
 
   categoryId: undefined,
 
-  colorIds: [],
+  colorId: undefined,
 
   minPrice: undefined,
   maxPrice: undefined,
@@ -45,12 +43,29 @@ export function ShopPage() {
   const [mobileFiltersOpen, setMobileFiltersOpen] =
     useState(false);
 
-  const filteredProducts = useMemo(() => {
-    return filterStorefrontProducts(
-      storefrontProducts,
-      filters
-    );
-  }, [filters]);
+  // ==========================================================
+  // GET PRODUCTS FROM THE REAL API
+  // ==========================================================
+
+  const {
+    data: productsResponse,
+    isLoading,
+    isFetching,
+    isError,
+  } = useProducts(filters);
+
+  // ==========================================================
+  // REAL API DATA
+  // ==========================================================
+
+  const products = productsResponse?.data ?? [];
+
+  const totalProducts =
+    productsResponse?.pagination.total ?? 0;
+
+  // ==========================================================
+  // RESET FILTERS
+  // ==========================================================
 
   function resetFilters() {
     setFilters({
@@ -65,8 +80,6 @@ export function ShopPage() {
       ====================================================== */}
 
       <section className="relative min-h-[480px] overflow-hidden border-b border-border lg:min-h-[500px]">
-        {/* Background Image */}
-
         <Image
           src="/images/banners/collection.png"
           alt=""
@@ -76,11 +89,7 @@ export function ShopPage() {
           className="object-cover object-[70%_center] lg:object-center"
         />
 
-        {/* Image Overlay */}
-
         <div className="absolute inset-0 bg-black/40" />
-
-        {/* Header Content */}
 
         <div className="relative z-10 mx-auto flex min-h-[480px] max-w-[1440px] items-center px-5 py-16 sm:px-8 lg:min-h-[560px] lg:px-12 lg:py-20">
           <div className="max-w-2xl text-white">
@@ -106,21 +115,19 @@ export function ShopPage() {
       ====================================================== */}
 
       <section className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-12 lg:py-12">
-        {/* Search + Sort Toolbar */}
-
         <ShopToolbar
           filters={filters}
-          productCount={filteredProducts.length}
+          productCount={totalProducts}
           onChange={setFilters}
           onOpenFilters={() =>
             setMobileFiltersOpen(true)
           }
         />
 
-        {/* Filter Sidebar + Products */}
-
         <div className="mt-8 flex gap-10 lg:mt-10">
-          {/* Desktop Filter Sidebar */}
+          {/* ==================================================
+              DESKTOP FILTERS
+          ================================================== */}
 
           <aside className="hidden w-[230px] shrink-0 lg:block xl:w-[250px]">
             <ShopFilters
@@ -130,20 +137,40 @@ export function ShopPage() {
             />
           </aside>
 
-          {/* Products */}
+          {/* ==================================================
+              PRODUCTS
+          ================================================== */}
 
           <div className="min-w-0 flex-1">
-            {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-3">
-                {filteredProducts.map(
-                  (product) => (
+            {/* =================================================
+                INITIAL LOADING
+            ================================================= */}
+
+            {isLoading ? (
+              <ProductGridSkeleton />
+            ) : isError ? (
+              <ProductError onRetry={() => window.location.reload()} />
+            ) : products.length > 0 ? (
+              <>
+                {/* =================================================
+                    FETCHING INDICATOR
+                ================================================= */}
+
+                {isFetching && (
+                  <div className="mb-4 text-right text-xs text-muted-foreground">
+                    Updating products...
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-3">
+                  {products.map((product) => (
                     <ProductCard
                       key={product.id}
                       product={product}
                     />
-                  )
-                )}
-              </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <EmptyProducts
                 onReset={resetFilters}
@@ -159,8 +186,6 @@ export function ShopPage() {
 
       {mobileFiltersOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Overlay */}
-
           <button
             type="button"
             aria-label="Close filters"
@@ -169,8 +194,6 @@ export function ShopPage() {
             }
             className="absolute inset-0 bg-black/30"
           />
-
-          {/* Drawer */}
 
           <aside className="absolute right-0 top-0 h-full w-[min(88vw,380px)] overflow-y-auto bg-card px-6 py-8 shadow-xl">
             <div className="mb-8 flex items-center justify-between">
@@ -201,6 +224,65 @@ export function ShopPage() {
     </main>
   );
 }
+
+// ============================================================
+// PRODUCT SKELETON
+// ============================================================
+
+function ProductGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index}>
+          <div className="aspect-[4/5] animate-pulse bg-muted" />
+
+          <div className="mt-4 h-4 w-3/4 animate-pulse bg-muted" />
+
+          <div className="mt-2 h-4 w-1/3 animate-pulse bg-muted" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================
+// API ERROR
+// ============================================================
+
+function ProductError({
+  onRetry,
+}: {
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex min-h-[400px] flex-col items-center justify-center border border-border bg-card px-6 text-center">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+        Something went wrong
+      </p>
+
+      <h2 className="mt-4 font-serif text-3xl">
+        We could not load the collection
+      </h2>
+
+      <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+        Please try again. If the problem continues,
+        check your connection and try again later.
+      </p>
+
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-6 border border-foreground bg-foreground px-5 py-3 text-sm font-medium text-background transition hover:opacity-90"
+      >
+        Try again
+      </button>
+    </div>
+  );
+}
+
+// ============================================================
+// EMPTY PRODUCTS
+// ============================================================
 
 function EmptyProducts({
   onReset,

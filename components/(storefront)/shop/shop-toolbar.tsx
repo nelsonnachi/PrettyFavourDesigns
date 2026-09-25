@@ -23,9 +23,7 @@ export function ShopToolbar({
     });
   }
 
-  function updateSort(
-    sort: ShopFiltersState["sort"]
-  ) {
+  function updateSort(sort: ShopFiltersState["sort"]) {
     onChange({
       ...filters,
       sort,
@@ -35,7 +33,7 @@ export function ShopToolbar({
 
   const activeFilterCount =
     Number(Boolean(filters.categoryId)) +
-    filters.colorIds.length +
+    Number(Boolean(filters.colorId)) +
     Number(filters.minPrice !== undefined) +
     Number(filters.maxPrice !== undefined) +
     Number(filters.inStock !== undefined) +
@@ -50,10 +48,7 @@ export function ShopToolbar({
       ====================================================== */}
 
       <div className="relative">
-        <label
-          htmlFor="shop-search"
-          className="sr-only"
-        >
+        <label htmlFor="shop-search" className="sr-only">
           Search products
         </label>
 
@@ -68,8 +63,6 @@ export function ShopToolbar({
           className="w-full border border-border bg-card px-4 py-3.5 pr-12 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-accent"
         />
 
-        {/* Search Icon */}
-
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
@@ -78,12 +71,7 @@ export function ShopToolbar({
           strokeWidth="1.8"
           className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground"
         >
-          <circle
-            cx="11"
-            cy="11"
-            r="7"
-          />
-
+          <circle cx="11" cy="11" r="7" />
           <path d="m20 20-4-4" />
         </svg>
       </div>
@@ -101,8 +89,6 @@ export function ShopToolbar({
             onClick={onOpenFilters}
             className="relative flex h-11 items-center justify-center gap-2 border border-border bg-card text-sm font-medium text-foreground transition hover:border-foreground"
           >
-            {/* Filter Icon */}
-
             <svg
               aria-hidden="true"
               viewBox="0 0 24 24"
@@ -117,8 +103,6 @@ export function ShopToolbar({
             </svg>
 
             <span>Filter</span>
-
-            {/* Active Filter Count */}
 
             {activeFilterCount > 0 && (
               <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1.5 text-[10px] font-semibold text-background">
@@ -142,46 +126,26 @@ export function ShopToolbar({
               value={filters.sort}
               onChange={(event) =>
                 updateSort(
-                  event.target
-                    .value as ShopFiltersState["sort"]
+                  event.target.value as ShopFiltersState["sort"]
                 )
               }
               className="h-11 w-full appearance-none border border-border bg-card px-4 pr-10 text-center text-sm font-medium text-foreground outline-none transition focus:border-accent"
             >
-              <option value="newest">
-                Newest
-              </option>
-
-              <option value="oldest">
-                Oldest
-              </option>
-
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
               <option value="price_asc">
                 Price: Low to High
               </option>
-
               <option value="price_desc">
                 Price: High to Low
               </option>
-
-              <option value="name_asc">
-                Name: A–Z
-              </option>
-
-              <option value="name_desc">
-                Name: Z–A
-              </option>
-
-              <option value="rating">
-                Highest Rated
-              </option>
-
+              <option value="name_asc">Name: A–Z</option>
+              <option value="name_desc">Name: Z–A</option>
+              <option value="rating">Highest Rated</option>
               <option value="best_selling">
                 Best Selling
               </option>
             </select>
-
-            {/* Sort Icon */}
 
             <svg
               aria-hidden="true"
@@ -201,13 +165,9 @@ export function ShopToolbar({
           </div>
         </div>
 
-        {/* Product Count */}
-
         <p className="mt-4 text-center text-xs text-muted-foreground">
           {productCount}{" "}
-          {productCount === 1
-            ? "product"
-            : "products"}
+          {productCount === 1 ? "product" : "products"}
         </p>
       </div>
 
@@ -216,19 +176,13 @@ export function ShopToolbar({
       ====================================================== */}
 
       <div className="mt-5 hidden items-center justify-between lg:flex">
-        {/* LEFT */}
-
         <p className="text-sm text-muted-foreground">
           Showing{" "}
           <span className="font-medium text-foreground">
             {productCount}
           </span>{" "}
-          {productCount === 1
-            ? "product"
-            : "products"}
+          {productCount === 1 ? "product" : "products"}
         </p>
-
-        {/* RIGHT */}
 
         <div className="flex items-center gap-3">
           <label
@@ -243,40 +197,22 @@ export function ShopToolbar({
             value={filters.sort}
             onChange={(event) =>
               updateSort(
-                event.target
-                  .value as ShopFiltersState["sort"]
+                event.target.value as ShopFiltersState["sort"]
               )
             }
             className="border border-border bg-card px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
           >
-            <option value="newest">
-              Newest
-            </option>
-
-            <option value="oldest">
-              Oldest
-            </option>
-
+            <option value="newest">Newest</option>
+            <option value="oldest">Oldest</option>
             <option value="price_asc">
               Price: Low to High
             </option>
-
             <option value="price_desc">
               Price: High to Low
             </option>
-
-            <option value="name_asc">
-              Name: A–Z
-            </option>
-
-            <option value="name_desc">
-              Name: Z–A
-            </option>
-
-            <option value="rating">
-              Highest Rated
-            </option>
-
+            <option value="name_asc">Name: A–Z</option>
+            <option value="name_desc">Name: Z–A</option>
+            <option value="rating">Highest Rated</option>
             <option value="best_selling">
               Best Selling
             </option>

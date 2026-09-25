@@ -12,20 +12,24 @@ import {
   ShoppingBag,
   Star,
 } from "lucide-react";
+import { PublicProductDetails } from "@/lib/query/products/product-types";
 
-import type { StorefrontProduct } from "@/data/storefront-products";
 
 type ProductDetailsProps = {
-  product: StorefrontProduct;
+  product: PublicProductDetails;
 };
 
-export function ProductDetails({ product }: ProductDetailsProps) {
+export function ProductDetails({
+  product,
+}: ProductDetailsProps) {
   // ==========================================================
   // SORT IMAGES
   // ==========================================================
 
   const sortedImages = useMemo(() => {
-    return [...(product.images ?? [])].sort((a, b) => a.position - b.position);
+    return [...product.images].sort(
+      (a, b) => a.position - b.position,
+    );
   }, [product.images]);
 
   // ==========================================================
@@ -33,23 +37,25 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   // ==========================================================
 
   const primaryImage =
-    sortedImages.find((image) => image.isPrimary) ?? sortedImages[0] ?? null;
+    sortedImages.find((image) => image.isPrimary) ??
+    sortedImages[0] ??
+    null;
 
   // ==========================================================
   // SELECTED IMAGE
   // ==========================================================
 
-  const [selectedImageId, setSelectedImageId] = useState(
-    primaryImage?.id ?? "",
-  );
+  const [selectedImageId, setSelectedImageId] =
+    useState<string>(primaryImage?.id ?? "");
 
   // ==========================================================
-  // SELECTED VARIANT
+  // SELECTED COLOR VARIANT
   // ==========================================================
 
-  const [selectedVariantId, setSelectedVariantId] = useState(
-    product.variants[0]?.id ?? "",
-  );
+  const [selectedVariantId, setSelectedVariantId] =
+    useState<string>(
+      product.variants[0]?.id ?? "",
+    );
 
   // ==========================================================
   // QUANTITY
@@ -61,53 +67,89 @@ export function ProductDetails({ product }: ProductDetailsProps) {
   // WISHLIST
   // ==========================================================
 
-  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [isWishlisted, setIsWishlisted] =
+    useState(false);
 
   // ==========================================================
   // CURRENT IMAGE
   // ==========================================================
 
   const selectedImage =
-    sortedImages.find((image) => image.id === selectedImageId) ?? primaryImage;
+    sortedImages.find(
+      (image) => image.id === selectedImageId,
+    ) ?? primaryImage;
 
   // ==========================================================
   // CURRENT VARIANT
   // ==========================================================
 
   const selectedVariant =
-    product.variants.find((variant) => variant.id === selectedVariantId) ??
-    product.variants[0];
+    product.variants.find(
+      (variant) =>
+        variant.id === selectedVariantId,
+    ) ?? product.variants[0];
 
   // ==========================================================
   // AVAILABLE STOCK
   // ==========================================================
+  //
+  // Your API already calculates this.
+  //
+  // We do NOT calculate:
+  //
+  // stock - reservedStock
+  //
+  // because the public API returns:
+  //
+  // availableStock
+  //
+  // ==========================================================
 
-  const availableStock = selectedVariant
-    ? Math.max(selectedVariant.stock - selectedVariant.reservedStock, 0)
-    : 0;
+  const availableStock =
+    selectedVariant?.availableStock ?? 0;
+
+  // ==========================================================
+  // PRICE
+  // ==========================================================
+
+  const price = Number(product.price);
+
+  const compareAtPrice =
+    product.compareAtPrice !== null
+      ? Number(product.compareAtPrice)
+      : null;
 
   // ==========================================================
   // DISCOUNT
   // ==========================================================
 
   const hasDiscount =
-    product.compareAtPrice !== null &&
-    product.compareAtPrice !== undefined &&
-    product.compareAtPrice > product.price;
+    compareAtPrice !== null &&
+    compareAtPrice > price;
 
   const discountPercentage = hasDiscount
     ? Math.round(
-        ((product.compareAtPrice! - product.price) / product.compareAtPrice!) *
+        ((compareAtPrice - price) /
+          compareAtPrice) *
           100,
       )
     : 0;
+
+  // ==========================================================
+  // RATING
+  // ==========================================================
+
+  const averageRating =
+    Number(product.averageRating);
 
   // ==========================================================
   // QUANTITY CONTROLS
   // ==========================================================
 
   function decreaseQuantity() {
-    setQuantity((current) => Math.max(current - 1, 1));
+    setQuantity((current) =>
+      Math.max(current - 1, 1),
+    );
   }
 
   function increaseQuantity() {
@@ -115,7 +157,12 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
 
-    setQuantity((current) => Math.min(current + 1, availableStock));
+    setQuantity((current) =>
+      Math.min(
+        current + 1,
+        availableStock,
+      ),
+    );
   }
 
   // ==========================================================
@@ -127,16 +174,25 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
 
-    const currentIndex = sortedImages.findIndex(
-      (image) => image.id === selectedImageId,
-    );
+    const currentIndex =
+      sortedImages.findIndex(
+        (image) =>
+          image.id === selectedImageId,
+      );
 
-    const safeCurrentIndex = currentIndex === -1 ? 0 : currentIndex;
+    const safeCurrentIndex =
+      currentIndex === -1
+        ? 0
+        : currentIndex;
 
     const previousIndex =
-      safeCurrentIndex <= 0 ? sortedImages.length - 1 : safeCurrentIndex - 1;
+      safeCurrentIndex <= 0
+        ? sortedImages.length - 1
+        : safeCurrentIndex - 1;
 
-    setSelectedImageId(sortedImages[previousIndex].id);
+    setSelectedImageId(
+      sortedImages[previousIndex].id,
+    );
   }
 
   function showNextImage() {
@@ -144,16 +200,26 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       return;
     }
 
-    const currentIndex = sortedImages.findIndex(
-      (image) => image.id === selectedImageId,
-    );
+    const currentIndex =
+      sortedImages.findIndex(
+        (image) =>
+          image.id === selectedImageId,
+      );
 
-    const safeCurrentIndex = currentIndex === -1 ? 0 : currentIndex;
+    const safeCurrentIndex =
+      currentIndex === -1
+        ? 0
+        : currentIndex;
 
     const nextIndex =
-      safeCurrentIndex >= sortedImages.length - 1 ? 0 : safeCurrentIndex + 1;
+      safeCurrentIndex >=
+      sortedImages.length - 1
+        ? 0
+        : safeCurrentIndex + 1;
 
-    setSelectedImageId(sortedImages[nextIndex].id);
+    setSelectedImageId(
+      sortedImages[nextIndex].id,
+    );
   }
 
   // ==========================================================
@@ -173,7 +239,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       productId: product.id,
       productName: product.name,
       variantId: selectedVariant.id,
-      colorId: selectedVariant.color.id,
+      colorId: selectedVariant.colorId,
       colorName: selectedVariant.color.name,
       sku: selectedVariant.sku,
       quantity,
@@ -201,7 +267,9 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
           <span>/</span>
 
-          <span className="text-foreground">{product.name}</span>
+          <span className="text-foreground">
+            {product.name}
+          </span>
         </div>
 
         {/* ==================================================
@@ -215,41 +283,49 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
           <div className="min-w-0">
             <div className="grid gap-4 lg:grid-cols-[88px_minmax(0,1fr)]">
-              {/* =============================================
-                  THUMBNAILS
-              ============================================== */}
+              {/* THUMBNAILS */}
 
               <div className="order-2 flex gap-3 overflow-x-auto lg:order-1 lg:flex-col">
-                {sortedImages.map((image, index) => {
-                  const isSelected = image.id === selectedImageId;
+                {sortedImages.map(
+                  (image, index) => {
+                    const isSelected =
+                      image.id ===
+                      selectedImageId;
 
-                  return (
-                    <button
-                      key={image.id}
-                      type="button"
-                      onClick={() => setSelectedImageId(image.id)}
-                      aria-label={`View product image ${index + 1}`}
-                      className={`relative size-20 shrink-0 overflow-hidden border transition sm:size-24 lg:size-[76px] ${
-                        isSelected
-                          ? "border-foreground"
-                          : "border-border hover:border-foreground/50"
-                      }`}
-                    >
-                      <Image
-                        src={image.url}
-                        alt={`${product.name} image ${index + 1}`}
-                        fill
-                        sizes="96px"
-                        className="object-cover"
-                      />
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={image.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedImageId(
+                            image.id,
+                          )
+                        }
+                        aria-label={`View product image ${
+                          index + 1
+                        }`}
+                        className={`relative size-20 shrink-0 overflow-hidden border transition sm:size-24 lg:size-[76px] ${
+                          isSelected
+                            ? "border-foreground"
+                            : "border-border hover:border-foreground/50"
+                        }`}
+                      >
+                        <Image
+                          src={image.url}
+                          alt={`${product.name} image ${
+                            index + 1
+                          }`}
+                          fill
+                          sizes="96px"
+                          className="object-cover"
+                        />
+                      </button>
+                    );
+                  },
+                )}
               </div>
 
-              {/* =============================================
-                  MAIN IMAGE
-              ============================================== */}
+              {/* MAIN IMAGE */}
 
               <div className="order-1 lg:order-2">
                 <div className="group relative aspect-[4/5] overflow-hidden bg-[#f3eee8]">
@@ -269,9 +345,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                     </div>
                   )}
 
-                  {/* =========================================
-                      BADGES
-                  ========================================== */}
+                  {/* BADGES */}
 
                   <div className="absolute left-4 top-4 flex flex-col gap-2">
                     {product.isNewArrival && (
@@ -287,28 +361,37 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                     )}
                   </div>
 
-                  {/* =========================================
-                      IMAGE ARROWS
-                  ========================================== */}
+                  {/* IMAGE ARROWS */}
 
-                  {sortedImages.length > 1 && (
+                  {sortedImages.length >
+                    1 && (
                     <>
                       <button
                         type="button"
-                        onClick={showPreviousImage}
+                        onClick={
+                          showPreviousImage
+                        }
                         aria-label="Previous image"
                         className="absolute left-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#211b17] opacity-100 shadow-sm transition hover:bg-white lg:opacity-0 lg:group-hover:opacity-100"
                       >
-                        <ChevronLeft className="size-5" strokeWidth={1.5} />
+                        <ChevronLeft
+                          className="size-5"
+                          strokeWidth={1.5}
+                        />
                       </button>
 
                       <button
                         type="button"
-                        onClick={showNextImage}
+                        onClick={
+                          showNextImage
+                        }
                         aria-label="Next image"
                         className="absolute right-3 top-1/2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-[#211b17] opacity-100 shadow-sm transition hover:bg-white lg:opacity-0 lg:group-hover:opacity-100"
                       >
-                        <ChevronRight className="size-5" strokeWidth={1.5} />
+                        <ChevronRight
+                          className="size-5"
+                          strokeWidth={1.5}
+                        />
                       </button>
                     </>
                   )}
@@ -322,9 +405,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           ================================================= */}
 
           <div className="flex flex-col lg:pt-2">
-            {/* ===============================================
-                LABEL
-            ================================================ */}
+            {/* LABEL */}
 
             <div className="flex items-center gap-3">
               {product.isBestSeller && (
@@ -333,28 +414,27 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 </span>
               )}
 
-              {product.isFeatured && !product.isBestSeller && (
-                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent">
-                  Featured
-                </span>
-              )}
+              {product.isFeatured &&
+                !product.isBestSeller && (
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-accent">
+                    Featured
+                  </span>
+                )}
             </div>
 
-            {/* ===============================================
-                PRODUCT NAME
-            ================================================ */}
+            {/* PRODUCT NAME */}
 
             <h1 className="mt-3 font-serif text-4xl leading-[1.05] tracking-[-0.03em] text-[#211b17] sm:text-5xl lg:text-6xl">
               {product.name}
             </h1>
 
-            {/* ===============================================
-                RATING
-            ================================================ */}
+            {/* RATING */}
 
             <div className="mt-5 flex items-center gap-3">
               <div className="flex items-center gap-1">
-                {Array.from({ length: 5 }).map((_, index) => (
+                {Array.from({
+                  length: 5,
+                }).map((_, index) => (
                   <Star
                     key={index}
                     className="size-4 fill-[#e85d22] text-[#e85d22]"
@@ -364,7 +444,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               </div>
 
               <span className="text-sm font-medium text-[#211b17]">
-                {product.averageRating.toFixed(1)}
+                {averageRating.toFixed(1)}
               </span>
 
               <span className="text-sm text-[#756a60]">
@@ -372,19 +452,20 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               </span>
             </div>
 
-            {/* ===============================================
-                PRICE
-            ================================================ */}
+            {/* PRICE */}
 
             <div className="mt-7 flex flex-wrap items-baseline gap-3">
               <span className="text-2xl font-semibold tracking-tight text-[#211b17] sm:text-3xl">
-                ₦{product.price.toLocaleString("en-NG")}
+                ₦{price.toLocaleString("en-NG")}
               </span>
 
               {hasDiscount && (
                 <>
                   <span className="text-sm text-[#8b8178] line-through">
-                    ₦{product.compareAtPrice!.toLocaleString("en-NG")}
+                    ₦
+                    {compareAtPrice!.toLocaleString(
+                      "en-NG",
+                    )}
                   </span>
 
                   <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[#e85d22]">
@@ -394,23 +475,15 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               )}
             </div>
 
-            {/* ===============================================
-                DESCRIPTION
-            ================================================ */}
+            {/* DESCRIPTION */}
 
             <p className="mt-7 max-w-xl text-sm leading-7 text-[#756a60] sm:text-base">
               {product.description}
             </p>
 
-            {/* ===============================================
-                DIVIDER
-            ================================================ */}
-
             <div className="my-8 border-t border-border" />
 
-            {/* ===============================================
-                COLOR
-            ================================================ */}
+            {/* COLOR */}
 
             <div>
               <div className="flex items-center justify-between">
@@ -420,7 +493,8 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                   </p>
 
                   <p className="mt-1 text-sm text-[#756a60]">
-                    {selectedVariant?.color.name ?? "Unavailable"}
+                    {selectedVariant?.color
+                      .name ?? "Unavailable"}
                   </p>
                 </div>
 
@@ -432,54 +506,62 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3">
-                {product.variants.map((variant) => {
-                  const variantAvailable = Math.max(
-                    variant.stock - variant.reservedStock,
-                    0,
-                  );
+                {product.variants.map(
+                  (variant) => {
+                    const isSelected =
+                      variant.id ===
+                      selectedVariantId;
 
-                  const isSelected = variant.id === selectedVariantId;
+                    const isOutOfStock =
+                      !variant.inStock;
 
-                  const isOutOfStock = variantAvailable <= 0;
+                    return (
+                      <button
+                        key={variant.id}
+                        type="button"
+                        disabled={isOutOfStock}
+                        onClick={() => {
+                          setSelectedVariantId(
+                            variant.id,
+                          );
 
-                  return (
-                    <button
-                      key={variant.id}
-                      type="button"
-                      disabled={isOutOfStock}
-                      onClick={() => {
-                        setSelectedVariantId(variant.id);
-                        setQuantity(1);
-                      }}
-                      className={`group flex items-center gap-2.5 border px-3 py-2.5 transition ${
-                        isSelected
-                          ? "border-foreground"
-                          : "border-border hover:border-foreground/60"
-                      } ${isOutOfStock ? "cursor-not-allowed opacity-40" : ""}`}
-                    >
-                      <span
-                        className={`size-5 rounded-full border border-black/10 ${
+                          setQuantity(1);
+                        }}
+                        className={`group flex items-center gap-2.5 border px-3 py-2.5 transition ${
                           isSelected
-                            ? "ring-2 ring-foreground ring-offset-2"
+                            ? "border-foreground"
+                            : "border-border hover:border-foreground/60"
+                        } ${
+                          isOutOfStock
+                            ? "cursor-not-allowed opacity-40"
                             : ""
                         }`}
-                        style={{
-                          backgroundColor: variant.color.hexCode ?? "#e5e5e5",
-                        }}
-                      />
+                      >
+                        <span
+                          className={`size-5 rounded-full border border-black/10 ${
+                            isSelected
+                              ? "ring-2 ring-foreground ring-offset-2"
+                              : ""
+                          }`}
+                          style={{
+                            backgroundColor:
+                              variant.color
+                                .hexCode ??
+                              "#e5e5e5",
+                          }}
+                        />
 
-                      <span className="text-xs font-medium text-[#211b17]">
-                        {variant.color.name}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span className="text-xs font-medium text-[#211b17]">
+                          {variant.color.name}
+                        </span>
+                      </button>
+                    );
+                  },
+                )}
               </div>
             </div>
 
-            {/* ===============================================
-                STOCK
-            ================================================ */}
+            {/* STOCK */}
 
             <div className="mt-6">
               {availableStock > 0 ? (
@@ -487,24 +569,21 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                   <span className="font-medium text-[#211b17]">
                     {availableStock}
                   </span>{" "}
-                  available in {selectedVariant?.color.name}
+                  available in{" "}
+                  {selectedVariant?.color
+                    .name}
                 </p>
               ) : (
                 <p className="text-sm font-medium text-[#e85d22]">
-                  This color is currently out of stock.
+                  This color is currently out
+                  of stock.
                 </p>
               )}
             </div>
 
-            {/* ===============================================================
-    QUANTITY + CART
-=============================================================== */}
+            {/* QUANTITY */}
 
             <div className="mt-7 flex flex-col gap-3">
-              {/* =============================================================
-      QUANTITY
-  ============================================================= */}
-
               <div className="flex h-14 w-full items-center justify-between border border-border sm:w-[145px]">
                 <button
                   type="button"
@@ -513,7 +592,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                   aria-label="Decrease quantity"
                   className="flex size-14 shrink-0 items-center justify-center text-[#211b17] transition hover:bg-[#f3eee8] disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <Minus className="size-4" strokeWidth={1.5} />
+                  <Minus
+                    className="size-4"
+                    strokeWidth={1.5}
+                  />
                 </button>
 
                 <span className="text-sm font-medium text-[#211b17]">
@@ -523,51 +605,69 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                 <button
                   type="button"
                   onClick={increaseQuantity}
-                  disabled={availableStock <= 0 || quantity >= availableStock}
+                  disabled={
+                    availableStock <= 0 ||
+                    quantity >=
+                      availableStock
+                  }
                   aria-label="Increase quantity"
                   className="flex size-14 shrink-0 items-center justify-center text-[#211b17] transition hover:bg-[#f3eee8] disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <Plus className="size-4" strokeWidth={1.5} />
+                  <Plus
+                    className="size-4"
+                    strokeWidth={1.5}
+                  />
                 </button>
               </div>
 
-              {/* =============================================================
-      ADD TO CART
-  ============================================================= */}
+              {/* ADD TO CART */}
 
               <button
                 type="button"
                 onClick={handleAddToCart}
-                disabled={!selectedVariant || availableStock <= 0}
-                className="flex h-14 w-full items-center justify-center gap-3 bg-[#211b17] px-6 text-sm font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#e85d22] disabled:cursor-not-allowed disabled:opacity-50 sm:h-14"
+                disabled={
+                  !selectedVariant ||
+                  availableStock <= 0
+                }
+                className="flex h-14 w-full items-center justify-center gap-3 bg-[#211b17] px-6 text-sm font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#e85d22] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <ShoppingBag className="size-5" strokeWidth={1.5} />
+                <ShoppingBag
+                  className="size-5"
+                  strokeWidth={1.5}
+                />
 
-                {availableStock > 0 ? "Add to cart" : "Out of stock"}
+                {availableStock > 0
+                  ? "Add to cart"
+                  : "Out of stock"}
               </button>
             </div>
 
-            {/* ===============================================================
-    WISHLIST
-=============================================================== */}
+            {/* WISHLIST */}
 
             <button
               type="button"
-              onClick={() => setIsWishlisted((current) => !current)}
+              onClick={() =>
+                setIsWishlisted(
+                  (current) => !current,
+                )
+              }
               className="mt-3 flex h-14 w-full items-center justify-center gap-2 border border-border px-6 text-sm font-semibold uppercase tracking-[0.12em] text-[#211b17] transition hover:border-foreground sm:h-12"
             >
               <Heart
                 className={`size-5 ${
-                  isWishlisted ? "fill-[#e85d22] text-[#e85d22]" : ""
+                  isWishlisted
+                    ? "fill-[#e85d22] text-[#e85d22]"
+                    : ""
                 }`}
                 strokeWidth={1.5}
               />
 
-              {isWishlisted ? "Saved to wishlist" : "Add to wishlist"}
+              {isWishlisted
+                ? "Saved to wishlist"
+                : "Add to wishlist"}
             </button>
-            {/* ===============================================
-                PRODUCT INFO
-            ================================================ */}
+
+            {/* PRODUCT INFO */}
 
             <div className="mt-8 border-t border-border">
               <div className="flex items-center justify-between border-b border-border py-4">
@@ -627,9 +727,10 @@ export function ProductDetails({ product }: ProductDetailsProps) {
               </p>
 
               <p className="mt-4 text-sm leading-7 text-[#756a60] sm:text-base sm:leading-8">
-                Thoughtfully designed with a balance of practicality and refined
-                style, this piece is made to move naturally through your
-                everyday routine.
+                Thoughtfully designed with a balance
+                of practicality and refined style,
+                this piece is made to move naturally
+                through your everyday routine.
               </p>
             </div>
           </div>

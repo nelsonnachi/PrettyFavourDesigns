@@ -2,12 +2,17 @@
 
 import { useState } from "react";
 
+import { useCategories } from "@/lib/query/categories/category-queries";
+import { useColors } from "@/lib/query/colors/color-queries";
+
+import type { Category } from "@/lib/query/categories/category-types";
+import type { Color } from "@/lib/query/colors/color-types";
+
 export type ShopFiltersState = {
   search: string;
 
   categoryId?: string;
-
-  colorIds: string[];
+  colorId?: string;
 
   minPrice?: number;
   maxPrice?: number;
@@ -38,83 +43,6 @@ type ShopFiltersProps = {
   onReset: () => void;
 };
 
-type CategoryOption = {
-  id: string;
-  name: string;
-};
-
-type ColorOption = {
-  id: string;
-  name: string;
-  value: string;
-};
-
-/*
- * Temporary dummy categories.
- *
- * Later, these should come from your categories API.
- */
-const CATEGORIES: CategoryOption[] = [
-  {
-    id: "category-handbags",
-    name: "Handbags",
-  },
-  {
-    id: "category-crossbody",
-    name: "Crossbody Bags",
-  },
-  {
-    id: "category-shoulder-bags",
-    name: "Shoulder Bags",
-  },
-  {
-    id: "category-clutches",
-    name: "Clutches",
-  },
-  {
-    id: "category-satchels",
-    name: "Satchels",
-  },
-];
-
-/*
- * Temporary dummy colors.
- *
- * Later, these can come from your colors API/table.
- */
-const COLORS: ColorOption[] = [
-  {
-    id: "color-black",
-    name: "Black",
-    value: "#111111",
-  },
-  {
-    id: "color-brown",
-    name: "Brown",
-    value: "#8B4513",
-  },
-  {
-    id: "color-tan",
-    name: "Tan",
-    value: "#C19A6B",
-  },
-  {
-    id: "color-red",
-    name: "Red",
-    value: "#B91C1C",
-  },
-  {
-    id: "color-green",
-    name: "Green",
-    value: "#355E3B",
-  },
-  {
-    id: "color-white",
-    name: "White",
-    value: "#F5F5F5",
-  },
-];
-
 type PriceOption = {
   label: string;
   minPrice?: number;
@@ -137,20 +65,35 @@ const PRICE_OPTIONS: PriceOption[] = [
   },
 ];
 
-export function ShopFilters({
-  filters,
-  onChange,
-  onReset,
-}: ShopFiltersProps) {
+export function ShopFilters({ filters, onChange, onReset }: ShopFiltersProps) {
   const [categoryOpen, setCategoryOpen] = useState(true);
   const [priceOpen, setPriceOpen] = useState(true);
   const [colorOpen, setColorOpen] = useState(true);
   const [availabilityOpen, setAvailabilityOpen] = useState(true);
   const [collectionOpen, setCollectionOpen] = useState(true);
 
-  function updateFilter(
-    updates: Partial<ShopFiltersState>
-  ) {
+  // ==========================================================
+  // CATEGORIES
+  // ==========================================================
+
+  const { data: categoriesResponse, isLoading: categoriesLoading } =
+    useCategories();
+
+  const categories: Category[] = categoriesResponse?.data ?? [];
+
+  // ==========================================================
+  // COLORS
+  // ==========================================================
+
+  const { data: colorsResponse, isLoading: colorsLoading } = useColors();
+
+  const colors: Color[] = colorsResponse ?? [];
+
+  // ==========================================================
+  // UPDATE FILTER
+  // ==========================================================
+
+  function updateFilter(updates: Partial<ShopFiltersState>) {
     onChange({
       ...filters,
       ...updates,
@@ -158,37 +101,31 @@ export function ShopFilters({
     });
   }
 
+  // ==========================================================
+  // CATEGORY
+  // ==========================================================
+
   function handleCategoryChange(categoryId: string) {
     updateFilter({
-      categoryId:
-        filters.categoryId === categoryId
-          ? undefined
-          : categoryId,
+      categoryId: filters.categoryId === categoryId ? undefined : categoryId,
     });
   }
+
+  // ==========================================================
+  // COLOR
+  // ==========================================================
 
   function handleColorChange(colorId: string) {
-    const colorAlreadySelected =
-      filters.colorIds.includes(colorId);
-
-    if (colorAlreadySelected) {
-      updateFilter({
-        colorIds: filters.colorIds.filter(
-          (id) => id !== colorId
-        ),
-      });
-
-      return;
-    }
-
     updateFilter({
-      colorIds: [...filters.colorIds, colorId],
+      colorId: filters.colorId === colorId ? undefined : colorId,
     });
   }
 
-  function handlePriceChange(
-    option: PriceOption
-  ) {
+  // ==========================================================
+  // PRICE
+  // ==========================================================
+
+  function handlePriceChange(option: PriceOption) {
     const isAlreadySelected =
       filters.minPrice === option.minPrice &&
       filters.maxPrice === option.maxPrice;
@@ -208,9 +145,7 @@ export function ShopFilters({
     });
   }
 
-  function isPriceSelected(
-    option: PriceOption
-  ) {
+  function isPriceSelected(option: PriceOption) {
     return (
       filters.minPrice === option.minPrice &&
       filters.maxPrice === option.maxPrice
@@ -226,9 +161,7 @@ export function ShopFilters({
       <div className="border-t border-border py-6">
         <button
           type="button"
-          onClick={() =>
-            setCategoryOpen(!categoryOpen)
-          }
+          onClick={() => setCategoryOpen(!categoryOpen)}
           className="flex w-full items-center justify-between text-sm font-medium"
         >
           <span>Category</span>
@@ -240,27 +173,31 @@ export function ShopFilters({
 
         {categoryOpen && (
           <div className="mt-5 space-y-4">
-            {CATEGORIES.map((category) => (
-              <label
-                key={category.id}
-                className="flex cursor-pointer items-center gap-3 text-sm text-muted-foreground"
-              >
-                <input
-                  type="checkbox"
-                  checked={
-                    filters.categoryId === category.id
-                  }
-                  onChange={() =>
-                    handleCategoryChange(
-                      category.id
-                    )
-                  }
-                  className="h-4 w-4 accent-[var(--accent)]"
-                />
+            {categoriesLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading categories...
+              </p>
+            ) : categories.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No categories available.
+              </p>
+            ) : (
+              categories.map((category) => (
+                <label
+                  key={category.id}
+                  className="flex cursor-pointer items-center gap-3 text-sm text-muted-foreground"
+                >
+                  <input
+                    type="checkbox"
+                    checked={filters.categoryId === category.id}
+                    onChange={() => handleCategoryChange(category.id)}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
 
-                <span>{category.name}</span>
-              </label>
-            ))}
+                  <span>{category.name}</span>
+                </label>
+              ))
+            )}
           </div>
         )}
       </div>
@@ -272,16 +209,12 @@ export function ShopFilters({
       <div className="border-t border-border py-6">
         <button
           type="button"
-          onClick={() =>
-            setPriceOpen(!priceOpen)
-          }
+          onClick={() => setPriceOpen(!priceOpen)}
           className="flex w-full items-center justify-between text-sm font-medium"
         >
           <span>Price Range</span>
 
-          <span className="text-lg leading-none">
-            {priceOpen ? "−" : "+"}
-          </span>
+          <span className="text-lg leading-none">{priceOpen ? "−" : "+"}</span>
         </button>
 
         {priceOpen && (
@@ -295,17 +228,13 @@ export function ShopFilters({
                   type="radio"
                   name="price-range"
                   checked={isPriceSelected(option)}
-                  onChange={() =>
-                    handlePriceChange(option)
-                  }
+                  onChange={() => handlePriceChange(option)}
                   className="h-4 w-4 accent-[var(--accent)]"
                 />
 
                 <span>{option.label}</span>
               </label>
             ))}
-
-            {/* Custom price range */}
 
             <div className="border-t border-border pt-4">
               <p className="mb-3 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
@@ -323,9 +252,7 @@ export function ShopFilters({
                       minPrice:
                         event.target.value === ""
                           ? undefined
-                          : Number(
-                              event.target.value
-                            ),
+                          : Number(event.target.value),
                     })
                   }
                   className="w-full border border-border bg-card px-3 py-2.5 text-sm outline-none focus:border-accent"
@@ -341,9 +268,7 @@ export function ShopFilters({
                       maxPrice:
                         event.target.value === ""
                           ? undefined
-                          : Number(
-                              event.target.value
-                            ),
+                          : Number(event.target.value),
                     })
                   }
                   className="w-full border border-border bg-card px-3 py-2.5 text-sm outline-none focus:border-accent"
@@ -361,62 +286,56 @@ export function ShopFilters({
       <div className="border-t border-border py-6">
         <button
           type="button"
-          onClick={() =>
-            setColorOpen(!colorOpen)
-          }
+          onClick={() => setColorOpen(!colorOpen)}
           className="flex w-full items-center justify-between text-sm font-medium"
         >
           <span>Color</span>
 
-          <span className="text-lg leading-none">
-            {colorOpen ? "−" : "+"}
-          </span>
+          <span className="text-lg leading-none">{colorOpen ? "−" : "+"}</span>
         </button>
 
         {colorOpen && (
           <div className="mt-5 space-y-4">
-            {COLORS.map((color) => {
-              const selected =
-                filters.colorIds.includes(
-                  color.id
-                );
+            {colorsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading colors...</p>
+            ) : colors.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No colors available.
+              </p>
+            ) : (
+              colors.map((color) => {
+                const selected = filters.colorId === color.id;
 
-              return (
-                <label
-                  key={color.id}
-                  className="flex cursor-pointer items-center gap-3 text-sm text-muted-foreground"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected}
-                    onChange={() =>
-                      handleColorChange(
-                        color.id
-                      )
-                    }
-                    className="sr-only"
-                  />
-
-                  <span
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                      selected
-                        ? "border-foreground"
-                        : "border-border"
-                    }`}
+                return (
+                  <label
+                    key={color.id}
+                    className="flex cursor-pointer items-center gap-3 text-sm text-muted-foreground"
                   >
-                    <span
-                      className="h-3.5 w-3.5 rounded-full border border-black/10"
-                      style={{
-                        backgroundColor:
-                          color.value,
-                      }}
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => handleColorChange(color.id)}
+                      className="sr-only"
                     />
-                  </span>
 
-                  <span>{color.name}</span>
-                </label>
-              );
-            })}
+                    <span
+                      className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                        selected ? "border-foreground" : "border-border"
+                      }`}
+                    >
+                      <span
+                        className="h-3.5 w-3.5 rounded-full border border-black/10"
+                        style={{
+                          backgroundColor: color.hexCode ?? "#e5e5e5",
+                        }}
+                      />
+                    </span>
+
+                    <span>{color.name}</span>
+                  </label>
+                );
+              })
+            )}
           </div>
         )}
       </div>
@@ -428,11 +347,7 @@ export function ShopFilters({
       <div className="border-t border-border py-6">
         <button
           type="button"
-          onClick={() =>
-            setAvailabilityOpen(
-              !availabilityOpen
-            )
-          }
+          onClick={() => setAvailabilityOpen(!availabilityOpen)}
           className="flex w-full items-center justify-between text-sm font-medium"
         >
           <span>Availability</span>
@@ -449,14 +364,11 @@ export function ShopFilters({
               checked={filters.inStock === true}
               onChange={(event) =>
                 updateFilter({
-                  inStock: event.target.checked
-                    ? true
-                    : undefined,
+                  inStock: event.target.checked ? true : undefined,
                 })
               }
               className="h-4 w-4 accent-[var(--accent)]"
             />
-
             In stock only
           </label>
         )}
@@ -469,9 +381,7 @@ export function ShopFilters({
       <div className="border-t border-border py-6">
         <button
           type="button"
-          onClick={() =>
-            setCollectionOpen(!collectionOpen)
-          }
+          onClick={() => setCollectionOpen(!collectionOpen)}
           className="flex w-full items-center justify-between text-sm font-medium"
         >
           <span>Collection</span>
@@ -489,52 +399,39 @@ export function ShopFilters({
                 checked={filters.isFeatured === true}
                 onChange={(event) =>
                   updateFilter({
-                    isFeatured: event.target.checked
-                      ? true
-                      : undefined,
+                    isFeatured: event.target.checked ? true : undefined,
                   })
                 }
                 className="h-4 w-4 accent-[var(--accent)]"
               />
-
               Featured
             </label>
 
             <label className="flex cursor-pointer items-center gap-3 text-sm text-muted-foreground">
               <input
                 type="checkbox"
-                checked={
-                  filters.isNewArrival === true
-                }
+                checked={filters.isNewArrival === true}
                 onChange={(event) =>
                   updateFilter({
-                    isNewArrival: event.target.checked
-                      ? true
-                      : undefined,
+                    isNewArrival: event.target.checked ? true : undefined,
                   })
                 }
                 className="h-4 w-4 accent-[var(--accent)]"
               />
-
               New arrivals
             </label>
 
             <label className="flex cursor-pointer items-center gap-3 text-sm text-muted-foreground">
               <input
                 type="checkbox"
-                checked={
-                  filters.isBestSeller === true
-                }
+                checked={filters.isBestSeller === true}
                 onChange={(event) =>
                   updateFilter({
-                    isBestSeller: event.target.checked
-                      ? true
-                      : undefined,
+                    isBestSeller: event.target.checked ? true : undefined,
                   })
                 }
                 className="h-4 w-4 accent-[var(--accent)]"
               />
-
               Best sellers
             </label>
           </div>

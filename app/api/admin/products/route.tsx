@@ -618,6 +618,16 @@ export async function POST(req: NextRequest) {
       uploadedPublicIds.map((publicId) => deleteImageFromCloudinary(publicId)),
     );
 
-    return handleApiError(error);
+    console.error("POST /api/admin/products error:", error);
+
+    return Response.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      {
+        status: 500,
+      },
+    );
   }
 }

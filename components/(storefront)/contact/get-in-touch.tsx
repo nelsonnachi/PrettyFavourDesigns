@@ -462,7 +462,7 @@ export function GetInTouch() {
         {/* Background Image */}
 
         <Image
-          src="/images/banner/thankyouimage.png"
+          src="/images/banners/thankyouimage.png"
           alt=""
           fill
           sizes="100vw"

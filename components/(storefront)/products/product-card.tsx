@@ -11,6 +11,8 @@ import {
   useWishlistStatus,
 } from "@/lib/query/wishlist/wishlist-queries";
 
+import { useAddToCart } from "@/lib/query/cart/cart-queries";
+
 import type { PublicProduct } from "@/lib/query/products/product-types";
 
 // ============================================================
@@ -25,13 +27,17 @@ type ProductCardProps = {
 // PRODUCT CARD
 // ============================================================
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({
+  product,
+}: ProductCardProps) {
   // ==========================================================
   // PRIMARY IMAGE
   // ==========================================================
 
   const primaryImage =
-    product.images.find((image) => image.isPrimary) ??
+    product.images.find(
+      (image) => image.isPrimary,
+    ) ??
     product.images[0] ??
     null;
 
@@ -42,24 +48,34 @@ export function ProductCard({ product }: ProductCardProps) {
   const price = Number(product.price);
 
   const compareAtPrice =
-    product.compareAtPrice !== null ? Number(product.compareAtPrice) : null;
+    product.compareAtPrice !== null
+      ? Number(product.compareAtPrice)
+      : null;
 
   // ==========================================================
   // DISCOUNT
   // ==========================================================
 
-  const hasDiscount = compareAtPrice !== null && compareAtPrice > price;
+  const hasDiscount =
+    compareAtPrice !== null &&
+    compareAtPrice > price;
 
   const discountPercentage = hasDiscount
-    ? Math.round(((compareAtPrice - price) / compareAtPrice) * 100)
+    ? Math.round(
+        ((compareAtPrice - price) /
+          compareAtPrice) *
+          100,
+      )
     : 0;
 
   // ==========================================================
   // WISHLIST STATUS
   // ==========================================================
 
-  const { data: wishlistStatus, isLoading: wishlistLoading } =
-    useWishlistStatus(product.id);
+  const {
+    data: wishlistStatus,
+    isLoading: wishlistLoading,
+  } = useWishlistStatus(product.id);
 
   // ==========================================================
   // WISHLIST MUTATIONS
@@ -70,30 +86,37 @@ export function ProductCard({ product }: ProductCardProps) {
   const removeWishlist = useRemoveFromWishlist();
 
   // ==========================================================
-  // CURRENT WISHLIST STATE
+  // CART MUTATION
   // ==========================================================
 
-  const isInWishlist = wishlistStatus?.isInWishlist ?? false;
+  const addToCartMutation = useAddToCart();
+
+  // ==========================================================
+  // WISHLIST STATE
+  // ==========================================================
+
+  const isInWishlist =
+    wishlistStatus?.isInWishlist ?? false;
 
   const wishlistMutationLoading =
-    addWishlist.isPending || removeWishlist.isPending;
+    addWishlist.isPending ||
+    removeWishlist.isPending;
+
+  // ==========================================================
+  // CART STATE
+  // ==========================================================
+
+  const isAddingToCart =
+    addToCartMutation.isPending;
 
   // ==========================================================
   // HANDLE WISHLIST
   // ==========================================================
 
   function handleWishlist() {
-    // --------------------------------------------------------
-    // Prevent multiple clicks while request is running
-    // --------------------------------------------------------
-
     if (wishlistMutationLoading) {
       return;
     }
-
-    // --------------------------------------------------------
-    // Remove from wishlist
-    // --------------------------------------------------------
 
     if (isInWishlist) {
       removeWishlist.mutate(product.id);
@@ -101,14 +124,69 @@ export function ProductCard({ product }: ProductCardProps) {
       return;
     }
 
-    // --------------------------------------------------------
-    // Add to wishlist
-    // --------------------------------------------------------
-
     addWishlist.mutate({
       productId: product.id,
     });
   }
+
+  // ==========================================================
+  // PRODUCT VARIANTS
+  // ==========================================================
+
+  const hasVariants =
+    product.variants &&
+    product.variants.length > 0;
+
+  const hasMultipleColors =
+    hasVariants &&
+    product.variants.length > 1;
+
+  const singleVariant =
+    hasVariants &&
+    product.variants.length === 1
+      ? product.variants[0]
+      : null;
+
+  // ==========================================================
+  // SINGLE VARIANT STOCK
+  // ==========================================================
+
+  const singleVariantOutOfStock =
+    singleVariant
+      ? !singleVariant.inStock ||
+        singleVariant.availableStock <= 0
+      : false;
+
+  // ==========================================================
+  // HANDLE ADD TO CART
+  // ==========================================================
+
+  function handleAddToCart() {
+    if (isAddingToCart) {
+      return;
+    }
+
+    if (!singleVariant) {
+      return;
+    }
+
+    if (
+      !singleVariant.inStock ||
+      singleVariant.availableStock <= 0
+    ) {
+      return;
+    }
+
+    addToCartMutation.mutate({
+      productId: product.id,
+      variantId: singleVariant.id,
+      quantity: 1,
+    });
+  }
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
     <article className="group flex min-w-0 flex-col">
@@ -117,7 +195,10 @@ export function ProductCard({ product }: ProductCardProps) {
       ===================================================== */}
 
       <div className="relative overflow-hidden bg-[#f3eee8]">
-        <Link href={`/products/${product.slug}`} className="block">
+        <Link
+          href={`/products/${product.slug}`}
+          className="block"
+        >
           <div className="relative aspect-[1/1.08] w-full">
             {primaryImage ? (
               <Image
@@ -164,7 +245,10 @@ export function ProductCard({ product }: ProductCardProps) {
         <button
           type="button"
           onClick={handleWishlist}
-          disabled={wishlistLoading || wishlistMutationLoading}
+          disabled={
+            wishlistLoading ||
+            wishlistMutationLoading
+          }
           aria-label={
             isInWishlist
               ? `Remove ${product.name} from wishlist`
@@ -176,7 +260,11 @@ export function ProductCard({ product }: ProductCardProps) {
           <Heart
             className="size-4"
             strokeWidth={1.5}
-            fill={isInWishlist ? "currentColor" : "none"}
+            fill={
+              isInWishlist
+                ? "currentColor"
+                : "none"
+            }
           />
         </button>
       </div>
@@ -186,7 +274,9 @@ export function ProductCard({ product }: ProductCardProps) {
       ===================================================== */}
 
       <div className="flex flex-1 flex-col pt-4">
-        <Link href={`/products/${product.slug}`}>
+        <Link
+          href={`/products/${product.slug}`}
+        >
           <h3 className="font-serif text-[18px] font-medium leading-[1.15] tracking-[-0.02em] text-[#211b17] transition-colors duration-200 group-hover:text-[#e85d22] sm:text-[19px]">
             {product.name}
           </h3>
@@ -211,7 +301,10 @@ export function ProductCard({ product }: ProductCardProps) {
 
           {hasDiscount && (
             <span className="text-[11px] text-[#8b8178] line-through">
-              ₦{compareAtPrice.toLocaleString("en-NG")}
+              ₦
+              {compareAtPrice!.toLocaleString(
+                "en-NG",
+              )}
             </span>
           )}
         </div>
@@ -220,14 +313,43 @@ export function ProductCard({ product }: ProductCardProps) {
             ADD TO CART
         =================================================== */}
 
-        <button
-          type="button"
-          className="mt-4 flex w-full items-center justify-center gap-2 border border-[#211b17] bg-[#211b17] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition-all duration-200 hover:border-[#e85d22] hover:bg-[#e85d22]"
-        >
-          <ShoppingBag className="size-3.5" strokeWidth={1.5} />
+        {hasMultipleColors ? (
+          <Link
+            href={`/products/${product.slug}`}
+            className="mt-4 flex w-full items-center justify-center gap-2 border border-[#211b17] bg-[#211b17] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition-all duration-200 hover:border-[#e85d22] hover:bg-[#e85d22]"
+          >
+            <ShoppingBag
+              className="size-3.5"
+              strokeWidth={1.5}
+            />
 
-          <span>Add to cart</span>
-        </button>
+            <span>Choose color</span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={handleAddToCart}
+            disabled={
+              isAddingToCart ||
+              !singleVariant ||
+              singleVariantOutOfStock
+            }
+            className="mt-4 flex w-full items-center justify-center gap-2 border border-[#211b17] bg-[#211b17] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition-all duration-200 hover:border-[#e85d22] hover:bg-[#e85d22] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ShoppingBag
+              className="size-3.5"
+              strokeWidth={1.5}
+            />
+
+            <span>
+              {isAddingToCart
+                ? "Adding..."
+                : singleVariantOutOfStock
+                  ? "Out of stock"
+                  : "Add to cart"}
+            </span>
+          </button>
+        )}
       </div>
     </article>
   );

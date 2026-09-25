@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ShoppingBag } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  ShoppingBag,
+} from "lucide-react";
 
 import { CartItem } from "@/components/(storefront)/cart/cart-item";
 import { useCart } from "@/lib/query/cart/cart-queries";
@@ -62,8 +66,8 @@ export default function CartPage() {
             </h1>
 
             <p className="mt-4 text-sm leading-7 text-[#756a60]">
-              Something went wrong while loading your cart.
-              Please try again.
+              Something went wrong while loading your
+              cart. Please try again.
             </p>
 
             <button
@@ -104,9 +108,9 @@ export default function CartPage() {
             </h1>
 
             <p className="mt-5 text-sm leading-7 text-[#756a60]">
-              Looks like you haven&apos;t added anything to
-              your cart yet. Explore our collection and find
-              something beautiful.
+              Looks like you haven&apos;t added anything
+              to your cart yet. Explore our collection
+              and find something beautiful.
             </p>
 
             <Link
@@ -149,7 +153,9 @@ export default function CartPage() {
 
             <p className="text-sm text-[#756a60]">
               {cart.totalItems}{" "}
-              {cart.totalItems === 1 ? "item" : "items"}
+              {cart.totalItems === 1
+                ? "item"
+                : "items"}
             </p>
           </div>
         </div>
@@ -175,8 +181,6 @@ export default function CartPage() {
                   />
                 ))}
               </div>
-
-              {/* Continue shopping */}
 
               <Link
                 href="/shop"
@@ -204,8 +208,6 @@ export default function CartPage() {
                 Your order
               </h2>
 
-              {/* Summary rows */}
-
               <div className="mt-8 space-y-4 border-b border-[#211b17]/10 pb-6">
                 <div className="flex items-center justify-between gap-4 text-sm">
                   <span className="text-[#756a60]">
@@ -224,9 +226,9 @@ export default function CartPage() {
 
                   <span className="font-medium">
                     ₦
-                    {Number(cart.subtotal).toLocaleString(
-                      "en-NG",
-                    )}
+                    {Number(
+                      cart.subtotal,
+                    ).toLocaleString("en-NG")}
                   </span>
                 </div>
 
@@ -241,8 +243,6 @@ export default function CartPage() {
                 </div>
               </div>
 
-              {/* Total */}
-
               <div className="flex items-center justify-between gap-4 py-6">
                 <span className="font-serif text-xl">
                   Total
@@ -250,13 +250,11 @@ export default function CartPage() {
 
                 <span className="text-lg font-semibold">
                   ₦
-                  {Number(cart.subtotal).toLocaleString(
-                    "en-NG",
-                  )}
+                  {Number(
+                    cart.subtotal,
+                  ).toLocaleString("en-NG")}
                 </span>
               </div>
-
-              {/* Checkout */}
 
               <Link
                 href="/checkout"

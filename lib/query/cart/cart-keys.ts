@@ -13,5 +13,6 @@ export const cartKeys = {
   // CURRENT CART
   // ----------------------------------------------------------
 
-  current: () => [...cartKeys.all, "current"] as const,
+  current: () =>
+    [...cartKeys.all, "current"] as const,
 };

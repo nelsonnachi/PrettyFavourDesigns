@@ -6,7 +6,6 @@ import type {
   CartResponse,
   ClearCartResponse,
   RemoveCartItemResponse,
-  UpdateCartItemInput,
   UpdateCartItemResponse,
 } from "./cart-types";
 

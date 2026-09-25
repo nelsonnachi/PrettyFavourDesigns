@@ -8,10 +8,15 @@
 
 export type CartProduct = {
   id: string;
+
   name: string;
+
   slug: string;
+
   sku: string;
+
   price: number;
+
   imageUrl: string | null;
 };
 
@@ -21,7 +26,9 @@ export type CartProduct = {
 
 export type CartColor = {
   id: string;
+
   name: string;
+
   hexCode: string | null;
 };
 
@@ -31,9 +38,13 @@ export type CartColor = {
 
 export type CartVariant = {
   id: string;
+
   sku: string;
+
   stock: number;
+
   reservedStock: number;
+
   availableStock: number;
 
   color: CartColor;
@@ -45,6 +56,7 @@ export type CartVariant = {
 
 export type CartItem = {
   id: string;
+
   quantity: number;
 
   product: CartProduct;
@@ -60,10 +72,13 @@ export type CartItem = {
 
 export type Cart = {
   id: string;
+
   items: CartItem[];
 
   totalItems: number;
+
   subtotal: number;
+
   itemCount: number;
 };
 
@@ -73,6 +88,7 @@ export type Cart = {
 
 export type CartResponse = {
   success: true;
+
   data: Cart;
 };
 
@@ -82,7 +98,9 @@ export type CartResponse = {
 
 export type AddToCartInput = {
   productId: string;
+
   variantId: string;
+
   quantity: number;
 };
 
@@ -92,15 +110,22 @@ export type AddToCartInput = {
 
 export type AddToCartResponse = {
   success: true;
+
   message: string;
 
   data: {
     id: string;
+
     cartId: string;
+
     productId: string;
+
     variantId: string;
+
     quantity: number;
+
     createdAt: string;
+
     updatedAt: string;
   };
 };
@@ -111,6 +136,7 @@ export type AddToCartResponse = {
 
 export type UpdateCartItemInput = {
   id: string;
+
   quantity: number;
 };
 
@@ -120,15 +146,22 @@ export type UpdateCartItemInput = {
 
 export type UpdateCartItemResponse = {
   success: true;
+
   message: string;
 
   data: {
     id: string;
+
     cartId: string;
+
     productId: string;
+
     variantId: string;
+
     quantity: number;
+
     createdAt: string;
+
     updatedAt: string;
   };
 };
@@ -139,6 +172,7 @@ export type UpdateCartItemResponse = {
 
 export type RemoveCartItemResponse = {
   success: true;
+
   message: string;
 };
 
@@ -148,5 +182,6 @@ export type RemoveCartItemResponse = {
 
 export type ClearCartResponse = {
   success: true;
+
   message: string;
 };

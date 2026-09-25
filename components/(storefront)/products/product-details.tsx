@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,8 +13,10 @@ import {
   ShoppingBag,
   Star,
 } from "lucide-react";
+
 import { PublicProductDetails } from "@/lib/query/products/product-types";
 
+import { useAddToCart } from "@/lib/query/cart/cart-queries";
 
 type ProductDetailsProps = {
   product: PublicProductDetails;
@@ -22,6 +25,12 @@ type ProductDetailsProps = {
 export function ProductDetails({
   product,
 }: ProductDetailsProps) {
+  // ==========================================================
+  // ADD TO CART MUTATION
+  // ==========================================================
+
+  const addToCartMutation = useAddToCart();
+
   // ==========================================================
   // SORT IMAGES
   // ==========================================================
@@ -37,7 +46,9 @@ export function ProductDetails({
   // ==========================================================
 
   const primaryImage =
-    sortedImages.find((image) => image.isPrimary) ??
+    sortedImages.find(
+      (image) => image.isPrimary,
+    ) ??
     sortedImages[0] ??
     null;
 
@@ -46,7 +57,9 @@ export function ProductDetails({
   // ==========================================================
 
   const [selectedImageId, setSelectedImageId] =
-    useState<string>(primaryImage?.id ?? "");
+    useState<string>(
+      primaryImage?.id ?? "",
+    );
 
   // ==========================================================
   // SELECTED COLOR VARIANT
@@ -76,7 +89,8 @@ export function ProductDetails({
 
   const selectedImage =
     sortedImages.find(
-      (image) => image.id === selectedImageId,
+      (image) =>
+        image.id === selectedImageId,
     ) ?? primaryImage;
 
   // ==========================================================
@@ -91,18 +105,6 @@ export function ProductDetails({
 
   // ==========================================================
   // AVAILABLE STOCK
-  // ==========================================================
-  //
-  // Your API already calculates this.
-  //
-  // We do NOT calculate:
-  //
-  // stock - reservedStock
-  //
-  // because the public API returns:
-  //
-  // availableStock
-  //
   // ==========================================================
 
   const availableStock =
@@ -141,6 +143,13 @@ export function ProductDetails({
 
   const averageRating =
     Number(product.averageRating);
+
+  // ==========================================================
+  // ADD TO CART STATE
+  // ==========================================================
+
+  const isAddingToCart =
+    addToCartMutation.isPending;
 
   // ==========================================================
   // QUANTITY CONTROLS
@@ -235,13 +244,15 @@ export function ProductDetails({
       return;
     }
 
-    console.log("Add to cart", {
+    if (quantity > availableStock) {
+      return;
+    }
+
+    addToCartMutation.mutate({
       productId: product.id,
-      productName: product.name,
+
       variantId: selectedVariant.id,
-      colorId: selectedVariant.colorId,
-      colorName: selectedVariant.color.name,
-      sku: selectedVariant.sku,
+
       quantity,
     });
   }
@@ -570,8 +581,7 @@ export function ProductDetails({
                     {availableStock}
                   </span>{" "}
                   available in{" "}
-                  {selectedVariant?.color
-                    .name}
+                  {selectedVariant?.color.name}
                 </p>
               ) : (
                 <p className="text-sm font-medium text-[#e85d22]">
@@ -588,7 +598,10 @@ export function ProductDetails({
                 <button
                   type="button"
                   onClick={decreaseQuantity}
-                  disabled={quantity <= 1}
+                  disabled={
+                    quantity <= 1 ||
+                    isAddingToCart
+                  }
                   aria-label="Decrease quantity"
                   className="flex size-14 shrink-0 items-center justify-center text-[#211b17] transition hover:bg-[#f3eee8] disabled:cursor-not-allowed disabled:opacity-30"
                 >
@@ -608,7 +621,8 @@ export function ProductDetails({
                   disabled={
                     availableStock <= 0 ||
                     quantity >=
-                      availableStock
+                      availableStock ||
+                    isAddingToCart
                   }
                   aria-label="Increase quantity"
                   className="flex size-14 shrink-0 items-center justify-center text-[#211b17] transition hover:bg-[#f3eee8] disabled:cursor-not-allowed disabled:opacity-30"
@@ -627,7 +641,8 @@ export function ProductDetails({
                 onClick={handleAddToCart}
                 disabled={
                   !selectedVariant ||
-                  availableStock <= 0
+                  availableStock <= 0 ||
+                  isAddingToCart
                 }
                 className="flex h-14 w-full items-center justify-center gap-3 bg-[#211b17] px-6 text-sm font-semibold uppercase tracking-[0.14em] text-white transition hover:bg-[#e85d22] disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -636,9 +651,11 @@ export function ProductDetails({
                   strokeWidth={1.5}
                 />
 
-                {availableStock > 0
-                  ? "Add to cart"
-                  : "Out of stock"}
+                {isAddingToCart
+                  ? "Adding..."
+                  : availableStock > 0
+                    ? "Add to cart"
+                    : "Out of stock"}
               </button>
             </div>
 

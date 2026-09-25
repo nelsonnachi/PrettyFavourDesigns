@@ -9,7 +9,7 @@ import type { CartItem as CartItemType } from "@/lib/query/cart/cart-types";
 import {
   useRemoveCartItem,
   useUpdateCartItem,
-} from "@/lib/query/cart/cart-mutations";
+} from "@/lib/query/cart/cart-queries";
 
 type CartItemProps = {
   item: CartItemType;
@@ -33,7 +33,7 @@ export function CartItem({ item }: CartItemProps) {
   // ==========================================================
 
   function handleDecrease() {
-    if (item.quantity <= 1) {
+    if (item.quantity <= 1 || isBusy) {
       return;
     }
 
@@ -48,7 +48,14 @@ export function CartItem({ item }: CartItemProps) {
   // ==========================================================
 
   function handleIncrease() {
-    if (item.quantity >= item.variant.availableStock) {
+    if (isBusy) {
+      return;
+    }
+
+    if (
+      item.quantity >=
+      item.variant.availableStock
+    ) {
       return;
     }
 
@@ -63,6 +70,10 @@ export function CartItem({ item }: CartItemProps) {
   // ==========================================================
 
   function handleRemove() {
+    if (isBusy) {
+      return;
+    }
+
     removeCartItemMutation.mutate(item.id);
   }
 
@@ -139,7 +150,8 @@ export function CartItem({ item }: CartItemProps) {
             className="size-3 rounded-full border border-[#211b17]/15"
             style={{
               backgroundColor:
-                item.variant.color.hexCode ?? "#d6cec4",
+                item.variant.color.hexCode ??
+                "#d6cec4",
             }}
             aria-hidden="true"
           />

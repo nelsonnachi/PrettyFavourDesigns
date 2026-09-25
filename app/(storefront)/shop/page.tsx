@@ -1,9 +1,5 @@
-import React from 'react'
+import { ShopPage } from "@/components/(storefront)/shop/shop-page";
 
-const page = () => {
-  return (
-    <div>page</div>
-  )
+export default function ShopRoute() {
+  return <ShopPage />;
 }
-
-export default page

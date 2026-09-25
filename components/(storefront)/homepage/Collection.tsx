@@ -55,7 +55,6 @@ export function OurCollection() {
               <ProductCard
                 key={product.id}
                 product={product}
-                variant="home"
               />
             ))}
           </div>

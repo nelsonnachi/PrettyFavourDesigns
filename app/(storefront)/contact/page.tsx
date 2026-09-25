@@ -1,9 +1,5 @@
-import React from 'react'
+import { GetInTouch } from "@/components/(storefront)/contact/get-in-touch";
 
-const page = () => {
-  return (
-    <div>page</div>
-  )
+export default function ContactPage() {
+  return <GetInTouch />;
 }
-
-export default page

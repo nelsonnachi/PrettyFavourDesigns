@@ -1,5 +1,5 @@
-
 import { apiClient } from "@/lib/api/client";
+
 import type {
   AdminOrderQueryParams,
   AdminOrderResponse,
@@ -15,19 +15,33 @@ import type {
 // ============================================================
 
 function buildQueryString(
-  params: Record<string, string | number | undefined>,
+  params: Record<
+    string,
+    string | number | undefined
+  >,
 ) {
   const searchParams = new URLSearchParams();
 
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== "") {
-      searchParams.set(key, String(value));
-    }
-  });
+  Object.entries(params).forEach(
+    ([key, value]) => {
+      if (
+        value !== undefined &&
+        value !== ""
+      ) {
+        searchParams.set(
+          key,
+          String(value),
+        );
+      }
+    },
+  );
 
-  const queryString = searchParams.toString();
+  const queryString =
+    searchParams.toString();
 
-  return queryString ? `?${queryString}` : "";
+  return queryString
+    ? `?${queryString}`
+    : "";
 }
 
 // ============================================================
@@ -42,15 +56,16 @@ function buildQueryString(
 export async function getCustomerOrders(
   params: CustomerOrderQueryParams = {},
 ) {
-  const queryString = buildQueryString({
-    page: params.page,
-    limit: params.limit,
-  });
+  const queryString =
+    buildQueryString({
+      page: params.page,
+      limit: params.limit,
+    });
 
-  const response = await apiClient<{
-    orders: CustomerOrdersResponse["orders"];
-    pagination: CustomerOrdersResponse["pagination"];
-  }>(`/api/orders${queryString}`);
+  const response =
+    await apiClient<CustomerOrdersResponse>(
+      `/api/orders${queryString}`,
+    );
 
   return response;
 }
@@ -60,10 +75,13 @@ export async function getCustomerOrders(
 // GET /api/orders/[id]
 // ============================================================
 
-export async function getCustomerOrder(orderId: string) {
-  const response = await apiClient<CustomerOrderResponse>(
-    `/api/orders/${orderId}`,
-  );
+export async function getCustomerOrder(
+  orderId: string,
+) {
+  const response =
+    await apiClient<CustomerOrderResponse>(
+      `/api/orders/${orderId}`,
+    );
 
   return response;
 }
@@ -73,12 +91,23 @@ export async function getCustomerOrder(orderId: string) {
 // PATCH /api/orders/[id]/cancel
 // ============================================================
 
-export async function cancelCustomerOrder(orderId: string) {
-  const response = await apiClient<{
-    order: CustomerOrderResponse["order"];
-  }>(`/api/orders/${orderId}/cancel`, {
-    method: "PATCH",
-  });
+export async function cancelCustomerOrder(
+  orderId: string,
+) {
+  const response =
+    await apiClient<{
+      success: boolean;
+      message: string;
+
+      data: {
+        order: CustomerOrderResponse["data"]["order"];
+      };
+    }>(
+      `/api/orders/${orderId}/cancel`,
+      {
+        method: "PATCH",
+      },
+    );
 
   return response;
 }
@@ -95,18 +124,22 @@ export async function cancelCustomerOrder(orderId: string) {
 export async function getAdminOrders(
   params: AdminOrderQueryParams = {},
 ) {
-  const queryString = buildQueryString({
-    page: params.page,
-    limit: params.limit,
-    search: params.search,
-    status: params.status,
-    paymentStatus: params.paymentStatus,
-    paymentMethod: params.paymentMethod,
-  });
+  const queryString =
+    buildQueryString({
+      page: params.page,
+      limit: params.limit,
+      search: params.search,
+      status: params.status,
+      paymentStatus:
+        params.paymentStatus,
+      paymentMethod:
+        params.paymentMethod,
+    });
 
-  const response = await apiClient<AdminOrdersResponse>(
-    `/api/admin/orders${queryString}`,
-  );
+  const response =
+    await apiClient<AdminOrdersResponse>(
+      `/api/admin/orders${queryString}`,
+    );
 
   return response;
 }
@@ -116,10 +149,13 @@ export async function getAdminOrders(
 // GET /api/admin/orders/[id]
 // ============================================================
 
-export async function getAdminOrder(orderId: string) {
-  const response = await apiClient<AdminOrderResponse>(
-    `/api/admin/orders/${orderId}`,
-  );
+export async function getAdminOrder(
+  orderId: string,
+) {
+  const response =
+    await apiClient<AdminOrderResponse>(
+      `/api/admin/orders/${orderId}`,
+    );
 
   return response;
 }
@@ -133,13 +169,22 @@ export async function updateAdminOrderStatus(
   orderId: string,
   data: UpdateOrderStatusInput,
 ) {
-  const response = await apiClient<{
-    order: AdminOrderResponse["order"];
-  }>(`/api/admin/orders/${orderId}`, {
-    method: "PATCH",
+  const response =
+    await apiClient<{
+      success: boolean;
+      message: string;
 
-    body: JSON.stringify(data),
-  });
+      data: {
+        order: AdminOrderResponse["data"]["order"];
+      };
+    }>(
+      `/api/admin/orders/${orderId}`,
+      {
+        method: "PATCH",
+
+        body: JSON.stringify(data),
+      },
+    );
 
   return response;
 }

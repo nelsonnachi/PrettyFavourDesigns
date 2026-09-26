@@ -9,7 +9,7 @@ import {
   createCheckout,
   initializePaystackPayment,
   verifyPaystackPayment,
-} from "./checkout-queries";
+} from "./checkout-api";
 
 import type {
   CheckoutRequest,
@@ -19,6 +19,8 @@ import type {
 
 import { cartKeys } from "@/lib/query/cart/cart-keys";
 
+import { orderKeys } from "../orders/order-keys";
+
 // ============================================================
 // CREATE CHECKOUT
 // ============================================================
@@ -27,21 +29,48 @@ export function useCreateCheckout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CheckoutRequest) =>
-      createCheckout(data),
+    mutationFn: (
+      data: CheckoutRequest,
+    ) => createCheckout(data),
 
     retry: false,
 
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // ======================================================
+      // CART
+      // ======================================================
+
       queryClient.invalidateQueries({
         queryKey: cartKeys.all,
       });
+
+      // ======================================================
+      // CUSTOMER ORDER LIST
+      // ======================================================
+
+      queryClient.invalidateQueries({
+        queryKey: orderKeys.customer.lists(),
+      });
+
+      // ======================================================
+      // CUSTOMER ORDER DETAIL
+      // ======================================================
+
+      const orderId =
+        result.data?.order?.id;
+
+      if (orderId) {
+        queryClient.invalidateQueries({
+          queryKey:
+            orderKeys.customer.detail(orderId),
+        });
+      }
     },
   });
 }
 
 // ============================================================
-// INITIALIZE PAYSTACK
+// INITIALIZE PAYSTACK PAYMENT
 // ============================================================
 
 export function useInitializePaystackPayment() {
@@ -56,7 +85,7 @@ export function useInitializePaystackPayment() {
 }
 
 // ============================================================
-// VERIFY PAYSTACK
+// VERIFY PAYSTACK PAYMENT
 // ============================================================
 
 export function useVerifyPaystackPayment() {
@@ -70,10 +99,37 @@ export function useVerifyPaystackPayment() {
 
     retry: false,
 
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // ======================================================
+      // CART
+      // ======================================================
+
       queryClient.invalidateQueries({
         queryKey: cartKeys.all,
       });
+
+      // ======================================================
+      // CUSTOMER ORDER LIST
+      // ======================================================
+
+      queryClient.invalidateQueries({
+        queryKey:
+          orderKeys.customer.lists(),
+      });
+
+      // ======================================================
+      // CUSTOMER ORDER DETAIL
+      // ======================================================
+
+      const orderId =
+        result.data?.orderId;
+
+      if (orderId) {
+        queryClient.invalidateQueries({
+          queryKey:
+            orderKeys.customer.detail(orderId),
+        });
+      }
     },
   });
 }

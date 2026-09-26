@@ -28,6 +28,9 @@ export interface WishlistProduct {
   ratingCount: number;
 
   soldCount: number;
+
+  // Primary product image
+  image: string | null;
 }
 
 // ============================================================

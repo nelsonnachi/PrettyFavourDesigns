@@ -26,9 +26,11 @@ export function useCustomerOrders(
   params: CustomerOrderQueryParams = {},
 ) {
   return useQuery({
-    queryKey: orderKeys.customer.list(params),
+    queryKey:
+      orderKeys.customer.list(params),
 
-    queryFn: () => getCustomerOrders(params),
+    queryFn: () =>
+      getCustomerOrders(params),
 
     staleTime: 60 * 1000,
   });
@@ -38,11 +40,17 @@ export function useCustomerOrders(
 // GET CUSTOMER ORDER
 // ============================================================
 
-export function useCustomerOrder(orderId: string) {
+export function useCustomerOrder(
+  orderId: string,
+) {
   return useQuery({
-    queryKey: orderKeys.customer.detail(orderId),
+    queryKey:
+      orderKeys.customer.detail(
+        orderId,
+      ),
 
-    queryFn: () => getCustomerOrder(orderId),
+    queryFn: () =>
+      getCustomerOrder(orderId),
 
     enabled: Boolean(orderId),
 
@@ -62,9 +70,11 @@ export function useAdminOrders(
   params: AdminOrderQueryParams = {},
 ) {
   return useQuery({
-    queryKey: orderKeys.admin.list(params),
+    queryKey:
+      orderKeys.admin.list(params),
 
-    queryFn: () => getAdminOrders(params),
+    queryFn: () =>
+      getAdminOrders(params),
 
     staleTime: 60 * 1000,
   });
@@ -74,11 +84,17 @@ export function useAdminOrders(
 // GET ADMIN ORDER
 // ============================================================
 
-export function useAdminOrder(orderId: string) {
+export function useAdminOrder(
+  orderId: string,
+) {
   return useQuery({
-    queryKey: orderKeys.admin.detail(orderId),
+    queryKey:
+      orderKeys.admin.detail(
+        orderId,
+      ),
 
-    queryFn: () => getAdminOrder(orderId),
+    queryFn: () =>
+      getAdminOrder(orderId),
 
     enabled: Boolean(orderId),
 

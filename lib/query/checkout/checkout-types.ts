@@ -2,6 +2,10 @@
 // CHECKOUT TYPES
 // ============================================================
 
+// ============================================================
+// PAYMENT METHOD
+// ============================================================
+
 export type PaymentMethod =
   | "paystack"
   | "cash_on_delivery";
@@ -37,7 +41,7 @@ export type CheckoutRequest = {
 
   addressId: string;
 
-  paymentMethod: "paystack" | "cash_on_delivery";
+  paymentMethod: PaymentMethod;
 
   notes?: string;
 };
@@ -48,6 +52,8 @@ export type CheckoutRequest = {
 
 export type CheckoutPayment = {
   id: string;
+
+  provider: string;
 
   reference: string;
 
@@ -102,7 +108,9 @@ export type CheckoutResponse = {
   data: {
     order: CheckoutOrder;
 
-    payment: CheckoutPayment;
+    payment: CheckoutPayment | null;
+
+    alreadyCreated?: boolean;
   };
 };
 

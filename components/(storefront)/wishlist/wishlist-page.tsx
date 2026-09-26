@@ -3,12 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import {
-  Heart,
-  HeartOff,
-  ShoppingBag,
-  Trash2,
-} from "lucide-react";
+import { Heart, HeartOff, ShoppingBag, Trash2 } from "lucide-react";
 
 import {
   useRemoveFromWishlist,
@@ -24,18 +19,13 @@ export function WishlistPage() {
   // GET WISHLIST
   // ==========================================================
 
-  const {
-    data: wishlist = [],
-    isLoading,
-    isError,
-  } = useWishlist();
+  const { data: wishlist = [], isLoading, isError } = useWishlist();
 
   // ==========================================================
   // REMOVE FROM WISHLIST
   // ==========================================================
 
-  const removeWishlist =
-    useRemoveFromWishlist();
+  const removeWishlist = useRemoveFromWishlist();
 
   // ==========================================================
   // LOADING
@@ -55,10 +45,7 @@ export function WishlistPage() {
             {Array.from({
               length: 4,
             }).map((_, index) => (
-              <div
-                key={index}
-                className="animate-pulse"
-              >
+              <div key={index} className="animate-pulse">
                 <div className="aspect-[1/1.08] bg-[#eee6da]" />
 
                 <div className="mt-4 h-5 w-3/4 bg-[#eee6da]" />
@@ -80,19 +67,14 @@ export function WishlistPage() {
     return (
       <section className="min-h-[60vh] bg-[#faf7f1]">
         <div className="mx-auto flex max-w-[1440px] flex-col items-center px-5 py-24 text-center sm:px-8 lg:px-12">
-          <HeartOff
-            className="size-10 text-[#756a60]"
-            strokeWidth={1}
-          />
+          <HeartOff className="size-10 text-[#756a60]" strokeWidth={1} />
 
           <h1 className="mt-6 font-serif text-3xl text-[#211b17]">
             Unable to load your wishlist
           </h1>
 
           <p className="mt-3 max-w-md text-sm leading-6 text-[#756a60]">
-            Something went wrong while
-            loading your wishlist. Please
-            try again.
+            Something went wrong while loading your wishlist. Please try again.
           </p>
         </div>
       </section>
@@ -108,10 +90,7 @@ export function WishlistPage() {
       <section className="min-h-[60vh] bg-[#faf7f1]">
         <div className="mx-auto flex max-w-[1440px] flex-col items-center px-5 py-24 text-center sm:px-8 lg:px-12">
           <div className="flex size-16 items-center justify-center rounded-full bg-[#eee6da]">
-            <Heart
-              className="size-7 text-[#211b17]"
-              strokeWidth={1.3}
-            />
+            <Heart className="size-7 text-[#211b17]" strokeWidth={1.3} />
           </div>
 
           <p className="mt-8 text-[10px] font-semibold uppercase tracking-[0.25em] text-[#e85d22]">
@@ -123,9 +102,8 @@ export function WishlistPage() {
           </h1>
 
           <p className="mt-5 max-w-md text-sm leading-6 text-[#756a60]">
-            Save the pieces you love and
-            come back to them whenever
-            you're ready.
+            Save the pieces you love and come back to them whenever you're
+            ready.
           </p>
 
           <Link
@@ -162,10 +140,7 @@ export function WishlistPage() {
               </h1>
 
               <p className="mt-3 text-sm text-[#756a60]">
-                {wishlist.length}{" "}
-                {wishlist.length === 1
-                  ? "item"
-                  : "items"}{" "}
+                {wishlist.length} {wishlist.length === 1 ? "item" : "items"}{" "}
                 saved
               </p>
             </div>
@@ -184,136 +159,108 @@ export function WishlistPage() {
         ==================================================== */}
 
         <div className="mt-10 grid grid-cols-2 gap-x-4 gap-y-12 sm:grid-cols-3 lg:grid-cols-4 lg:gap-x-6 lg:gap-y-16">
-          {wishlist.map(
-            (item) => {
-              const product =
-                item.product;
+          {wishlist.map((item) => {
+            const product = item.product;
 
-              const price =
-                Number(
-                  product.price,
-                );
+            const price = Number(product.price);
 
-              const compareAtPrice =
-                product.compareAtPrice !==
-                null
-                  ? Number(
-                      product.compareAtPrice,
-                    )
-                  : null;
+            const compareAtPrice =
+              product.compareAtPrice !== null
+                ? Number(product.compareAtPrice)
+                : null;
 
-              const hasDiscount =
-                compareAtPrice !== null &&
-                compareAtPrice > price;
+            const hasDiscount =
+              compareAtPrice !== null && compareAtPrice > price;
 
-              return (
-                <article
-                  key={item.id}
-                  className="group flex min-w-0 flex-col"
-                >
-                  {/* ==========================================
-                      IMAGE
-                  ========================================== */}
+            return (
+              <article key={item.id} className="group flex min-w-0 flex-col">
+                {/* ==========================================
+                    IMAGE
+                ========================================== */}
 
-                  <div className="relative overflow-hidden bg-[#f3eee8]">
-                    <Link
-                      href={`/products/${product.slug}`}
-                      className="block"
-                    >
-                      <div className="relative aspect-[1/1.08] w-full">
+                <div className="relative overflow-hidden bg-[#f3eee8]">
+                  <Link href={`/products/${product.slug}`} className="block">
+                    <div className="relative aspect-[1/1.08] w-full">
+                      {product.image ? (
+                        <Image
+                          src={product.image}
+                          alt={product.name}
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
+                      ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs text-[#756a60]">
                           No image
                         </div>
-                      </div>
-                    </Link>
+                      )}
+                    </div>
+                  </Link>
 
-                    {/* ======================================
-                        REMOVE
-                    ====================================== */}
+                  {/* ======================================
+      REMOVE
+  ====================================== */}
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeWishlist.mutate(
-                          product.id,
-                        )
-                      }
-                      disabled={
-                        removeWishlist.isPending
-                      }
-                      aria-label={`Remove ${product.name} from wishlist`}
-                      className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-white/90 text-[#211b17] shadow-sm backdrop-blur-sm transition-colors hover:bg-white hover:text-[#e85d22] disabled:opacity-50"
-                    >
-                      <Trash2
-                        className="size-4"
-                        strokeWidth={1.5}
-                      />
-                    </button>
+                  <button
+                    type="button"
+                    onClick={() => removeWishlist.mutate(product.id)}
+                    disabled={removeWishlist.isPending}
+                    aria-label={`Remove ${product.name} from wishlist`}
+                    className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full bg-white/90 text-[#211b17] shadow-sm backdrop-blur-sm transition-colors hover:bg-white hover:text-[#e85d22] disabled:opacity-50"
+                  >
+                    <Trash2 className="size-4" strokeWidth={1.5} />
+                  </button>
 
-                    {/* ======================================
-                        BADGES
-                    ====================================== */}
+                  {/* ======================================
+                      BADGES
+                  ====================================== */}
 
-                    {product.isNewArrival && (
-                      <span className="absolute left-3 top-3 bg-[#211b17] px-2.5 py-1.5 text-[9px] font-medium uppercase tracking-[0.12em] text-white">
-                        New
+                  {product.isNewArrival && (
+                    <span className="absolute left-3 top-3 bg-[#211b17] px-2.5 py-1.5 text-[9px] font-medium uppercase tracking-[0.12em] text-white">
+                      New
+                    </span>
+                  )}
+                </div>
+
+                {/* ==========================================
+                      INFORMATION
+                  ========================================== */}
+
+                <div className="flex flex-1 flex-col pt-4">
+                  <Link href={`/products/${product.slug}`}>
+                    <h2 className="font-serif text-[18px] font-medium leading-[1.15] tracking-[-0.02em] text-[#211b17] transition-colors group-hover:text-[#e85d22] sm:text-[19px]">
+                      {product.name}
+                    </h2>
+                  </Link>
+
+                  {/* PRICE */}
+
+                  <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-[14px] font-semibold text-[#211b17]">
+                      ₦{price.toLocaleString("en-NG")}
+                    </span>
+
+                    {hasDiscount && (
+                      <span className="text-[11px] text-[#8b8178] line-through">
+                        ₦{compareAtPrice.toLocaleString("en-NG")}
                       </span>
                     )}
                   </div>
 
-                  {/* ==========================================
-                      INFORMATION
-                  ========================================== */}
+                  {/* ADD TO CART */}
 
-                  <div className="flex flex-1 flex-col pt-4">
-                    <Link
-                      href={`/products/${product.slug}`}
-                    >
-                      <h2 className="font-serif text-[18px] font-medium leading-[1.15] tracking-[-0.02em] text-[#211b17] transition-colors group-hover:text-[#e85d22] sm:text-[19px]">
-                        {product.name}
-                      </h2>
-                    </Link>
+                  <button
+                    type="button"
+                    className="mt-4 flex w-full items-center justify-center gap-2 border border-[#211b17] bg-[#211b17] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:border-[#e85d22] hover:bg-[#e85d22]"
+                  >
+                    <ShoppingBag className="size-3.5" strokeWidth={1.5} />
 
-                    {/* PRICE */}
-
-                    <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
-                      <span className="text-[14px] font-semibold text-[#211b17]">
-                        ₦
-                        {price.toLocaleString(
-                          "en-NG",
-                        )}
-                      </span>
-
-                      {hasDiscount && (
-                        <span className="text-[11px] text-[#8b8178] line-through">
-                          ₦
-                          {compareAtPrice.toLocaleString(
-                            "en-NG",
-                          )}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* ADD TO CART */}
-
-                    <button
-                      type="button"
-                      className="mt-4 flex w-full items-center justify-center gap-2 border border-[#211b17] bg-[#211b17] px-4 py-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:border-[#e85d22] hover:bg-[#e85d22]"
-                    >
-                      <ShoppingBag
-                        className="size-3.5"
-                        strokeWidth={1.5}
-                      />
-
-                      <span>
-                        Add to cart
-                      </span>
-                    </button>
-                  </div>
-                </article>
-              );
-            },
-          )}
+                    <span>Add to cart</span>
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -227,37 +227,61 @@ export type AdminOrderDetails = {
 
 // ============================================================
 // CUSTOMER ORDER LIST RESPONSE
+// GET /api/orders
 // ============================================================
 
 export type CustomerOrdersResponse = {
-  orders: CustomerOrder[];
-  pagination: OrderPagination;
-};
+  success: boolean;
+  message: string;
 
-// ============================================================
-// ADMIN ORDER LIST RESPONSE
-// ============================================================
-
-export type AdminOrdersResponse = {
-  orders: AdminOrder[];
-  pagination: OrderPagination;
+  data: {
+    orders: CustomerOrder[];
+    pagination: OrderPagination;
+  };
 };
 
 // ============================================================
 // CUSTOMER SINGLE ORDER RESPONSE
+// GET /api/orders/[id]
 // ============================================================
 
 export type CustomerOrderResponse = {
-  order: CustomerOrderDetails;
-  items: OrderItem[];
-  payment: OrderPayment | null;
+  success: boolean;
+  message: string;
+
+  data: {
+    order: CustomerOrderDetails;
+    items: OrderItem[];
+    payment: OrderPayment | null;
+  };
+};
+
+// ============================================================
+// ADMIN ORDER LIST RESPONSE
+// GET /api/admin/orders
+// ============================================================
+
+export type AdminOrdersResponse = {
+  success: boolean;
+  message: string;
+
+  data: {
+    orders: AdminOrder[];
+    pagination: OrderPagination;
+  };
 };
 
 // ============================================================
 // ADMIN SINGLE ORDER RESPONSE
+// GET /api/admin/orders/[id]
 // ============================================================
 
-export type AdminOrderResponse = AdminOrderDetails;
+export type AdminOrderResponse = {
+  success: boolean;
+  message: string;
+
+  data: AdminOrderDetails;
+};
 
 // ============================================================
 // UPDATE ORDER STATUS

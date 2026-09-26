@@ -10,11 +10,11 @@ import { db } from "@/db/drizzle";
 
 import {
   products,
+  productImages,
   wishlistItems,
 } from "@/db/schema";
 
 import {
-  ApiError,
   handleApiError,
 } from "@/lib/APIs/api-errors";
 
@@ -47,6 +47,10 @@ export async function GET(
 
     // ========================================================
     // GET WISHLIST
+    // ========================================================
+    //
+    // We also join the product's primary image.
+    //
     // ========================================================
 
     const items = await db
@@ -92,6 +96,13 @@ export async function GET(
 
           soldCount:
             products.soldCount,
+
+          // ================================================
+          // PRIMARY PRODUCT IMAGE
+          // ================================================
+
+          image:
+            productImages.url,
         },
       })
       .from(wishlistItems)
@@ -100,6 +111,20 @@ export async function GET(
         eq(
           wishlistItems.productId,
           products.id,
+        ),
+      )
+      .leftJoin(
+        productImages,
+        and(
+          eq(
+            productImages.productId,
+            products.id,
+          ),
+
+          eq(
+            productImages.isPrimary,
+            true,
+          ),
         ),
       )
       .where(
@@ -208,9 +233,8 @@ export async function POST(
     // ========================================================
 
     if (!product) {
-      throw new ApiError(
+      throw new Error(
         "Product not found",
-        404,
       );
     }
 
@@ -223,9 +247,8 @@ export async function POST(
         "active" ||
       product.deletedAt !== null
     ) {
-      throw new ApiError(
+      throw new Error(
         "Product is not available",
-        404,
       );
     }
 
@@ -292,9 +315,8 @@ export async function POST(
     // ========================================================
 
     if (!item) {
-      throw new ApiError(
+      throw new Error(
         "Unable to add product to wishlist",
-        500,
       );
     }
 

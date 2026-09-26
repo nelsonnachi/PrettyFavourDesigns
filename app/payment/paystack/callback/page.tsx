@@ -51,8 +51,10 @@ function PaystackCallbackContent() {
 
   const verifyPaymentMutation = useVerifyPaystackPayment();
 
+  const verifyPayment = verifyPaymentMutation.mutateAsync;
+
   // ==========================================================
-  // REFERENCE
+  // PAYMENT REFERENCE
   // ==========================================================
 
   const reference = searchParams.get("reference");
@@ -62,10 +64,6 @@ function PaystackCallbackContent() {
   // ==========================================================
 
   useEffect(() => {
-    // ========================================================
-    // NO REFERENCE
-    // ========================================================
-
     if (!reference) {
       setState("failed");
 
@@ -73,10 +71,6 @@ function PaystackCallbackContent() {
 
       return;
     }
-
-    // ========================================================
-    // PREVENT DUPLICATE START
-    // ========================================================
 
     if (startedRef.current) {
       return;
@@ -86,26 +80,14 @@ function PaystackCallbackContent() {
 
     let cancelled = false;
 
-    // ========================================================
-    // VERIFY LOOP
-    // ========================================================
-
-    const verifyPayment = async () => {
+    const runVerification = async () => {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        // ====================================================
-        // COMPONENT UNMOUNTED
-        // ====================================================
-
         if (cancelled) {
           return;
         }
 
         try {
-          // ==================================================
-          // VERIFY
-          // ==================================================
-
-          const result = await verifyPaymentMutation.mutateAsync({
+          const result = await verifyPayment({
             reference,
           });
 
@@ -151,32 +133,15 @@ function PaystackCallbackContent() {
             `Payment is still being processed. Checking again... (${attempt}/${MAX_ATTEMPTS})`,
           );
 
-          // ==================================================
-          // WAIT BEFORE NEXT ATTEMPT
-          // ==================================================
-
           if (attempt < MAX_ATTEMPTS) {
             await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
           }
         } catch (error) {
-          // ==================================================
-          // STOP IF UNMOUNTED
-          // ==================================================
-
           if (cancelled) {
             return;
           }
 
           console.error("Payment verification error:", error);
-
-          // ==================================================
-          // NETWORK / SERVER ERROR
-          // ==================================================
-          //
-          // Give the server another chance while we still have
-          // polling attempts available.
-          //
-          // ==================================================
 
           if (attempt < MAX_ATTEMPTS) {
             setState("verifying");
@@ -189,10 +154,6 @@ function PaystackCallbackContent() {
 
             continue;
           }
-
-          // ==================================================
-          // FINAL ERROR
-          // ==================================================
 
           setState("failed");
 
@@ -209,14 +170,6 @@ function PaystackCallbackContent() {
       // ======================================================
       // MAX ATTEMPTS REACHED
       // ======================================================
-      //
-      // IMPORTANT:
-      //
-      // Do NOT call this "failed".
-      //
-      // The webhook may still complete the payment.
-      //
-      // ======================================================
 
       if (!cancelled) {
         setState("processing");
@@ -227,16 +180,12 @@ function PaystackCallbackContent() {
       }
     };
 
-    verifyPayment();
-
-    // ========================================================
-    // CLEANUP
-    // ========================================================
+    runVerification();
 
     return () => {
       cancelled = true;
     };
-  }, [reference, verifyPaymentMutation]);
+  }, [reference, verifyPayment]);
 
   // ==========================================================
   // VIEW ORDER
@@ -249,11 +198,11 @@ function PaystackCallbackContent() {
       return;
     }
 
-    router.push(`/account/orders/${orderId}`);
+    router.push(`/orders/${orderId}`);
   };
 
   // ==========================================================
-  // ORDERS
+  // GO TO ORDERS
   // ==========================================================
 
   const handleContinue = () => {
@@ -329,7 +278,7 @@ function PaystackCallbackContent() {
   }
 
   // ==========================================================
-  // STILL PROCESSING
+  // PROCESSING
   // ==========================================================
 
   if (state === "processing") {

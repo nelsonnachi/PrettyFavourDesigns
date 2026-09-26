@@ -323,7 +323,7 @@ export function ProductCard({
               strokeWidth={1.5}
             />
 
-            <span>Choose color</span>
+            <span>View details</span>
           </Link>
         ) : (
           <button

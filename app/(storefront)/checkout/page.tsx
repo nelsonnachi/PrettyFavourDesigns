@@ -1,9 +1,5 @@
-import React from 'react'
+import { CheckoutPage } from "@/components/(storefront)/checkout/checkout-page";
 
-const page = () => {
-  return (
-    <div>page</div>
-  )
+export default function CheckoutRoute() {
+  return <CheckoutPage />;
 }
-
-export default page

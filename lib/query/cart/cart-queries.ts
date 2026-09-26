@@ -69,8 +69,14 @@ export function useUpdateCartItem() {
     },
 
     onSuccess: async () => {
+      // ------------------------------------------------------
+      // Mark the cart query as stale and immediately refetch
+      // active cart queries.
+      // ------------------------------------------------------
+
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
+        refetchType: "active",
       });
     },
   });
@@ -91,6 +97,7 @@ export function useRemoveCartItem() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
+        refetchType: "active",
       });
     },
   });
@@ -109,6 +116,7 @@ export function useClearCart() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
+        refetchType: "active",
       });
     },
   });

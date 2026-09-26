@@ -3,13 +3,9 @@
 import Image from "next/image";
 import { useState } from "react";
 
-
 import { ProductCard } from "@/components/(storefront)/products/product-card";
 
-import {
-  ShopFilters,
-  type ShopFiltersState,
-} from "./shop-filters";
+import { ShopFilters, type ShopFiltersState } from "./shop-filters";
 
 import { ShopToolbar } from "./shop-toolbar";
 import { useProducts } from "@/lib/query/products/product-queries";
@@ -37,11 +33,9 @@ const DEFAULT_FILTERS: ShopFiltersState = {
 };
 
 export function ShopPage() {
-  const [filters, setFilters] =
-    useState<ShopFiltersState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<ShopFiltersState>(DEFAULT_FILTERS);
 
-  const [mobileFiltersOpen, setMobileFiltersOpen] =
-    useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // ==========================================================
   // GET PRODUCTS FROM THE REAL API
@@ -49,7 +43,7 @@ export function ShopPage() {
 
   const {
     data: productsResponse,
-    isLoading,
+    isPending,
     isFetching,
     isError,
   } = useProducts(filters);
@@ -60,8 +54,7 @@ export function ShopPage() {
 
   const products = productsResponse?.data ?? [];
 
-  const totalProducts =
-    productsResponse?.pagination.total ?? 0;
+  const totalProducts = productsResponse?.pagination.total ?? 0;
 
   // ==========================================================
   // RESET FILTERS
@@ -102,8 +95,7 @@ export function ShopPage() {
             </h1>
 
             <p className="mt-6 max-w-xl text-base leading-7 text-white/80 sm:text-lg">
-              Thoughtfully crafted bags designed
-              to become part of your everyday
+              Thoughtfully crafted bags designed to become part of your everyday
               story.
             </p>
           </div>
@@ -119,9 +111,7 @@ export function ShopPage() {
           filters={filters}
           productCount={totalProducts}
           onChange={setFilters}
-          onOpenFilters={() =>
-            setMobileFiltersOpen(true)
-          }
+          onOpenFilters={() => setMobileFiltersOpen(true)}
         />
 
         <div className="mt-8 flex gap-10 lg:mt-10">
@@ -146,7 +136,7 @@ export function ShopPage() {
                 INITIAL LOADING
             ================================================= */}
 
-            {isLoading ? (
+            {isPending ? (
               <ProductGridSkeleton />
             ) : isError ? (
               <ProductError onRetry={() => window.location.reload()} />
@@ -164,17 +154,12 @@ export function ShopPage() {
 
                 <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-3 xl:grid-cols-3">
                   {products.map((product) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                    />
+                    <ProductCard key={product.id} product={product} />
                   ))}
                 </div>
               </>
             ) : (
-              <EmptyProducts
-                onReset={resetFilters}
-              />
+              <EmptyProducts onReset={resetFilters} />
             )}
           </div>
         </div>
@@ -189,23 +174,17 @@ export function ShopPage() {
           <button
             type="button"
             aria-label="Close filters"
-            onClick={() =>
-              setMobileFiltersOpen(false)
-            }
+            onClick={() => setMobileFiltersOpen(false)}
             className="absolute inset-0 bg-black/30"
           />
 
           <aside className="absolute right-0 top-0 h-full w-[min(88vw,380px)] overflow-y-auto bg-card px-6 py-8 shadow-xl">
             <div className="mb-8 flex items-center justify-between">
-              <h2 className="font-serif text-3xl">
-                Filters
-              </h2>
+              <h2 className="font-serif text-3xl">Filters</h2>
 
               <button
                 type="button"
-                onClick={() =>
-                  setMobileFiltersOpen(false)
-                }
+                onClick={() => setMobileFiltersOpen(false)}
                 className="text-2xl"
                 aria-label="Close filters"
               >
@@ -249,11 +228,7 @@ function ProductGridSkeleton() {
 // API ERROR
 // ============================================================
 
-function ProductError({
-  onRetry,
-}: {
-  onRetry: () => void;
-}) {
+function ProductError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center border border-border bg-card px-6 text-center">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
@@ -265,8 +240,8 @@ function ProductError({
       </h2>
 
       <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-        Please try again. If the problem continues,
-        check your connection and try again later.
+        Please try again. If the problem continues, check your connection and
+        try again later.
       </p>
 
       <button
@@ -284,25 +259,18 @@ function ProductError({
 // EMPTY PRODUCTS
 // ============================================================
 
-function EmptyProducts({
-  onReset,
-}: {
-  onReset: () => void;
-}) {
+function EmptyProducts({ onReset }: { onReset: () => void }) {
   return (
     <div className="flex min-h-[400px] flex-col items-center justify-center border border-border bg-card px-6 text-center">
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
         Nothing found
       </p>
 
-      <h2 className="mt-4 font-serif text-3xl">
-        No bags match your filters
-      </h2>
+      <h2 className="mt-4 font-serif text-3xl">No bags match your filters</h2>
 
       <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground">
-        Try changing your search or removing
-        one of the filters to explore the full
-        collection.
+        Try changing your search or removing one of the filters to explore the
+        full collection.
       </p>
 
       <button

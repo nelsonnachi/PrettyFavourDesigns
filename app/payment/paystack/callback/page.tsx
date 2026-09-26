@@ -192,14 +192,14 @@ function PaystackCallbackContent() {
   // ==========================================================
 
   const handleViewOrder = () => {
-    if (!orderId) {
-      router.push("/orders");
+  if (!orderId) {
+    router.replace("/orders");
 
-      return;
-    }
+    return;
+  }
 
-    router.push(`/orders/${orderId}`);
-  };
+  router.replace(`/orders/${orderId}`);
+};
 
   // ==========================================================
   // GO TO ORDERS

@@ -1,6 +1,5 @@
 "use client";
 
-
 import { ProductDetails } from "@/components/(storefront)/products/product-details";
 import { ProductDetailsSkeleton } from "@/components/(storefront)/products/product-details-skeleton";
 import { useProduct } from "@/lib/query/products/product-queries";
@@ -15,14 +14,24 @@ export function ProductPageClient({
   const {
     data,
     isLoading,
+    isFetching,
     isError,
   } = useProduct(slug);
 
   // ==========================================================
-  // LOADING
+  // INITIAL LOADING
+  // ==========================================================
+  //
+  // Only show the skeleton when we have NO product data yet.
+  //
+  // This is important because TanStack Query can have cached
+  // product data while fetching fresh data in the background.
+  //
+  // Without "!data", the page can disappear and show the
+  // skeleton every time the product query starts fetching.
   // ==========================================================
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return <ProductDetailsSkeleton />;
   }
 
@@ -52,6 +61,20 @@ export function ProductPageClient({
   // ==========================================================
 
   return (
-    <ProductDetails product={data.data} />
+    <div className="relative">
+      <ProductDetails product={data.data} />
+
+      {/* ======================================================
+          BACKGROUND REFRESH INDICATOR
+      ====================================================== */}
+      {isFetching && (
+        <div className="pointer-events-none fixed right-4 top-20 z-40 sm:right-6">
+          <div className="flex items-center gap-2 border border-[#e6ddd1] bg-[#fffdf9] px-3 py-2 text-[10px] uppercase tracking-[0.12em] text-[#756a60] shadow-sm">
+            <span className="size-2 animate-pulse rounded-full bg-[#e85d22]" />
+            Updating
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

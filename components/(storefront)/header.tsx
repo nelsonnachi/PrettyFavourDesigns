@@ -7,11 +7,11 @@ import {
   Heart,
   Search,
   ShoppingBag,
-  UserRound,
 } from "lucide-react";
 
 import { MobileNav } from "@/components/(storefront)/mobile-nav";
 import { CartDrawer } from "@/components/(storefront)/cart/cart-drawer";
+import { AccountButton } from "@/components/(storefront)/account/account-button";
 
 import { useCart } from "@/lib/query/cart/cart-queries";
 import { useWishlist } from "@/lib/query/wishlist/wishlist-queries";
@@ -87,6 +87,7 @@ export function StorefrontHeader() {
     <>
       <header className="sticky top-0 z-50 border-b border-border/70 bg-[#faf7f1]/95 backdrop-blur-md">
         <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-10">
+
           {/* ==================================================
               LOGO
           ================================================== */}
@@ -126,6 +127,7 @@ export function StorefrontHeader() {
           ================================================== */}
 
           <div className="flex items-center gap-1">
+
             {/* =================================================
                 SEARCH
             ================================================= */}
@@ -145,16 +147,9 @@ export function StorefrontHeader() {
                 ACCOUNT
             ================================================= */}
 
-            <Link
-              href="/account"
-              aria-label="Account"
-              className="hidden h-9 w-9 items-center justify-center rounded-full text-[#211b17] transition-colors hover:bg-[#eee6da] hover:text-[#e85d22] sm:inline-flex"
-            >
-              <UserRound
-                className="size-[17px]"
-                strokeWidth={1.6}
-              />
-            </Link>
+            <div className="hidden sm:flex">
+              <AccountButton />
+            </div>
 
             {/* =================================================
                 WISHLIST

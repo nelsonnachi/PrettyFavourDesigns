@@ -51,9 +51,8 @@ export function FutureVision() {
           {/* DESCRIPTION */}
 
           <p className="mx-auto mt-8 max-w-2xl text-sm leading-8 text-white/65 sm:text-base sm:leading-8">
-            Our vision is to build a modern African brand with a
-            global perspective — one that creates products people are
-            proud to own, carry, gift, and keep.
+            From a simple need that turned into a passio, our vision is to build a modern African brand, an everyday aesthetics — one that creates products people are
+            proud to own, carry, gift, and keep. From one handmade bag to a growing brand - SHOPFD.
           </p>
 
           <p className="mx-auto mt-5 max-w-2xl text-sm leading-8 text-white/65 sm:text-base sm:leading-8">

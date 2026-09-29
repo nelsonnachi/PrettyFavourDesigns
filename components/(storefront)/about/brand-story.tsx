@@ -13,35 +13,27 @@ export function BrandStory() {
           {/* STORY */}
           <div>
             <h2 className="font-serif text-4xl leading-tight tracking-[-0.03em] text-[#211b17] sm:text-5xl">
-              It started with a simple belief.
+              It started with a simple need and a little curiosity.
             </h2>
 
             <div className="mt-8 space-y-6 text-sm leading-8 text-[#756a60] sm:text-base">
               <p>
-                Great design does not have to be complicated. It should
-                simply make everyday life feel a little better.
+                I needed a bag, but i couldn't afford the one I wanted. So i thought, "Why not try making one myself?." With no idea that it would grow into a business, I created my first bag from scratch - and to my surprise, it came out beautifully. 
               </p>
 
               <p>
-                Our journey began with a desire to create pieces that
-                could move effortlessly through real life — from busy
-                mornings and workdays to weekends, dinners, journeys,
-                and everything in between.
+                People around me loved it. They started asking if I could make one for them too, and what began as a simple attempt soon became something much bigger.
               </p>
 
               <p>
-                What began as a small idea grew into a brand built around
-                thoughtful design, dependable quality, and a deep
-                appreciation for the people who choose to carry our
-                products.
+                As the demand grew i knew i needed to improve my skills and take my craft more seriously. I invested in learning, upgraded my skill and continued exploring new designs and tenchniques. That simple decision to make a bag for myself became the beginning of PrettyFavourDesigns which subletted into what's known today as SHOPPFD.
               </p>
 
               <p>
-                Today, that original idea still guides everything we do.
-                We are not interested in creating products simply to
-                fill a shelf. We want to create pieces that earn a place
-                in your everyday life.
+                Today, SHOPPFD is a proudly growing brand creating beautiful, stylish and thoughtfully crafted bags for different needs and occasions. What started with <strong>"Let me try"</strong> has grown into a passion for crafting pieces that people are happy to carry.  
               </p>
+
+              <p>AND THIS IS JUST THE BEGINNING</p>
             </div>
           </div>
         </div>

@@ -193,7 +193,7 @@ export function GetInTouch() {
                       href="mailto:hello@shoppfd.com"
                       className="mt-2 block text-sm font-medium text-[#211b17] transition-colors hover:text-accent"
                     >
-                      hello@shoppfd.com
+                      you@shoppfd.com
                     </a>
                   </div>
                 </div>
@@ -214,7 +214,19 @@ export function GetInTouch() {
                       href="tel:+2340000000000"
                       className="mt-2 block text-sm font-medium text-[#211b17] transition-colors hover:text-accent"
                     >
-                      +234 000 000 0000
+                      +234 905 6066 289 / +234 911 6310 494
+                    </a>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#756a60]">
+                      Whatsapp
+                    </p>
+
+                    <a
+                      href="tel:+2340000000000"
+                      className="mt-2 block text-sm font-medium text-[#211b17] transition-colors hover:text-accent"
+                    >
+                      +234 817 8468 956
                     </a>
                   </div>
                 </div>

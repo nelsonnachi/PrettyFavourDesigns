@@ -8,6 +8,11 @@ export type InventoryStockStatus =
   | "low_stock"
   | "out_of_stock";
 
+export type InventoryItemStockStatus =
+  | "in_stock"
+  | "low_stock"
+  | "out_of_stock";
+
 // ============================================================
 // INVENTORY SORT
 // ============================================================
@@ -42,6 +47,10 @@ export type AdminInventoryProduct = {
   slug: string;
   sku: string;
   status: string;
+
+  description: string | null;
+  price: string | null;
+  costPrice: string | null;
 };
 
 // ============================================================
@@ -61,15 +70,21 @@ export type AdminInventoryColor = {
 
 export type AdminInventoryItem = {
   id: string;
+  productId: string;
+  colorId: string;
+
   sku: string;
+
   stock: number;
   reservedStock: number;
   availableStock: number;
+
+  stockStatus: InventoryItemStockStatus;
+
   createdAt: string;
   updatedAt: string;
 
   product: AdminInventoryProduct;
-
   color: AdminInventoryColor;
 };
 

@@ -1,53 +1,53 @@
 "use client";
 
+import { FormEvent, useState } from "react";
 import Link from "next/link";
-
 import {
-  AlertTriangle,
   ChevronLeft,
   ChevronRight,
+  Eye,
   Package,
   Search,
 } from "lucide-react";
 
-import { useState } from "react";
-
-import {
-  useAdminInventory,
-} from "@/lib/query/inventory/inventory-queries";
+import { useAdminInventory } from "@/lib/query/inventory/inventory-queries";
 
 import type {
-  AdminInventoryQuery,
+  InventoryItemStockStatus,
 } from "@/lib/query/inventory/inventory-types";
 
 // ============================================================
-// STOCK STATUS
+// STATUS HELPERS
 // ============================================================
 
-function getStockStatus(
-  availableStock: number,
+function getStatusLabel(
+  status: InventoryItemStockStatus,
 ) {
-  if (availableStock <= 0) {
-    return {
-      label: "Out of stock",
-      className:
-        "bg-destructive/10 text-destructive",
-    };
-  }
+  switch (status) {
+    case "in_stock":
+      return "In stock";
 
-  if (availableStock <= 5) {
-    return {
-      label: "Low stock",
-      className:
-        "bg-amber-500/10 text-amber-600",
-    };
-  }
+    case "low_stock":
+      return "Low stock";
 
-  return {
-    label: "In stock",
-    className:
-      "bg-emerald-500/10 text-emerald-600",
-  };
+    case "out_of_stock":
+      return "Out of stock";
+  }
+}
+
+function getStatusClasses(
+  status: InventoryItemStockStatus,
+) {
+  switch (status) {
+    case "in_stock":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-600/20";
+
+    case "low_stock":
+      return "bg-amber-50 text-amber-700 ring-amber-600/20";
+
+    case "out_of_stock":
+      return "bg-red-50 text-red-700 ring-red-600/20";
+  }
 }
 
 // ============================================================
@@ -55,429 +55,512 @@ function getStockStatus(
 // ============================================================
 
 export default function AdminInventoryPage() {
-  const [search, setSearch] =
-    useState("");
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
-  const [query, setQuery] =
-    useState<AdminInventoryQuery>({
-      page: 1,
-      limit: 20,
-      search: "",
-      stockStatus: "all",
-      sort: "recent",
-    });
+  const [page, setPage] = useState(1);
 
-  const inventoryQuery =
-    useAdminInventory(query);
+  const [limit] = useState(20);
 
-  const inventory =
-    inventoryQuery.data?.data ?? [];
+  const [searchInput, setSearchInput] = useState("");
 
-  const pagination =
-    inventoryQuery.data?.pagination;
+  const [search, setSearch] = useState("");
+
+  // ==========================================================
+  // INVENTORY QUERY
+  // ==========================================================
+
+  const inventoryQuery = useAdminInventory({
+    page,
+    limit,
+    search,
+    stockStatus: "all",
+    sort: "recent",
+  });
+
+  const inventory = inventoryQuery.data;
+
+  const items = inventory?.data ?? [];
+
+  const pagination = inventory?.pagination;
 
   // ==========================================================
   // SEARCH
   // ==========================================================
 
-  function handleSearch(
-    value: string,
-  ) {
-    setSearch(value);
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-    setQuery((current) => ({
-      ...current,
-      page: 1,
-      search: value,
-    }));
+    setPage(1);
+    setSearch(searchInput.trim());
   }
 
   // ==========================================================
-  // STOCK FILTER
+  // CLEAR SEARCH
   // ==========================================================
 
-  function handleStockStatus(
-    value: AdminInventoryQuery["stockStatus"],
-  ) {
-    setQuery((current) => ({
-      ...current,
-      page: 1,
-      stockStatus: value,
-    }));
+  function handleClearSearch() {
+    setSearchInput("");
+    setSearch("");
+    setPage(1);
   }
 
   // ==========================================================
-  // SORT
+  // LOADING
   // ==========================================================
 
-  function handleSort(
-    value: AdminInventoryQuery["sort"],
-  ) {
-    setQuery((current) => ({
-      ...current,
-      page: 1,
-      sort: value,
-    }));
+  if (inventoryQuery.isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="h-8 w-48 animate-pulse rounded-md bg-muted" />
+
+          <div className="mt-2 h-4 w-72 animate-pulse rounded-md bg-muted" />
+        </div>
+
+        <div className="rounded-xl border bg-card">
+          <div className="p-6">
+            <div className="h-10 w-full animate-pulse rounded-md bg-muted" />
+          </div>
+
+          <div className="divide-y">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-4 p-6"
+              >
+                <div className="h-10 w-10 animate-pulse rounded-md bg-muted" />
+
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-48 animate-pulse rounded bg-muted" />
+
+                  <div className="h-3 w-32 animate-pulse rounded bg-muted" />
+                </div>
+
+                <div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // ==========================================================
-  // PAGE
+  // ERROR
   // ==========================================================
 
-  function handlePage(
-    page: number,
-  ) {
-    setQuery((current) => ({
-      ...current,
-      page,
-    }));
+  if (inventoryQuery.isError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Inventory
+          </h1>
+
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your product inventory and stock levels.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+          <h2 className="font-semibold text-red-800">
+            Failed to load inventory
+          </h2>
+
+          <p className="mt-1 text-sm text-red-700">
+            {inventoryQuery.error instanceof Error
+              ? inventoryQuery.error.message
+              : "Something went wrong while loading inventory."}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => inventoryQuery.refetch()}
+            className="mt-4 rounded-md bg-red-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-800"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
   }
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       {/* ======================================================
           HEADER
       ====================================================== */}
 
-      <section>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent">
-            <Package
-              size={20}
-              strokeWidth={1.8}
-            />
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Inventory
+          </h1>
 
-          <div>
-            <h1 className="font-serif text-3xl tracking-tight sm:text-4xl">
-              Inventory
-            </h1>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage your product stock and inventory levels.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ======================================================
-          FILTERS
-      ====================================================== */}
-
-      <section className="rounded-xl border border-border bg-card p-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
-          {/* Search */}
-
-          <div className="relative flex-1">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) =>
-                handleSearch(
-                  event.target.value,
-                )
-              }
-              placeholder="Search product, SKU or color..."
-              className="h-10 w-full rounded-lg border border-border bg-background pl-10 pr-3 text-sm outline-none transition focus:border-accent"
-            />
-          </div>
-
-          {/* Stock status */}
-
-          <select
-            value={query.stockStatus}
-            onChange={(event) =>
-              handleStockStatus(
-                event.target
-                  .value as AdminInventoryQuery["stockStatus"],
-              )
-            }
-            className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent"
-          >
-            <option value="all">
-              All stock
-            </option>
-
-            <option value="in_stock">
-              In stock
-            </option>
-
-            <option value="low_stock">
-              Low stock
-            </option>
-
-            <option value="out_of_stock">
-              Out of stock
-            </option>
-          </select>
-
-          {/* Sort */}
-
-          <select
-            value={query.sort}
-            onChange={(event) =>
-              handleSort(
-                event.target
-                  .value as AdminInventoryQuery["sort"],
-              )
-            }
-            className="h-10 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-accent"
-          >
-            <option value="recent">
-              Recently updated
-            </option>
-
-            <option value="oldest">
-              Oldest
-            </option>
-
-            <option value="stock_asc">
-              Stock: low to high
-            </option>
-
-            <option value="stock_desc">
-              Stock: high to low
-            </option>
-          </select>
-        </div>
-      </section>
-
-      {/* ======================================================
-          LOADING
-      ====================================================== */}
-
-      {inventoryQuery.isLoading && (
-        <div className="rounded-xl border border-border bg-card p-10 text-center">
-          <p className="text-sm text-muted-foreground">
-            Loading inventory...
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your product inventory and stock levels.
           </p>
         </div>
-      )}
+
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Package className="h-4 w-4" />
+
+          <span>
+            {pagination?.total ?? 0} inventory items
+          </span>
+        </div>
+      </div>
 
       {/* ======================================================
-          ERROR
+          SEARCH
       ====================================================== */}
 
-      {inventoryQuery.isError && (
-        <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-6">
-          <div className="flex items-center gap-3">
-            <AlertTriangle
-              size={18}
-              className="text-destructive"
-            />
+      <div className="rounded-xl border bg-card">
+        <div className="p-4">
+          <form
+            onSubmit={handleSearch}
+            className="flex flex-col gap-3 sm:flex-row"
+          >
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
-            <div>
-              <p className="font-medium">
-                Failed to load inventory
-              </p>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                {inventoryQuery.error
-                  instanceof Error
-                  ? inventoryQuery.error.message
-                  : "Something went wrong."}
-              </p>
+              <input
+                type="search"
+                value={searchInput}
+                onChange={(event) =>
+                  setSearchInput(event.target.value)
+                }
+                placeholder="Search inventory..."
+                className="h-10 w-full rounded-md border bg-background pl-9 pr-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
             </div>
-          </div>
+
+            <button
+              type="submit"
+              className="h-10 rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            >
+              Search
+            </button>
+
+            {search && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="h-10 rounded-md border px-5 text-sm font-medium transition hover:bg-muted"
+              >
+                Clear
+              </button>
+            )}
+          </form>
         </div>
-      )}
+      </div>
 
       {/* ======================================================
           TABLE
       ====================================================== */}
 
-      {!inventoryQuery.isLoading &&
-        !inventoryQuery.isError && (
-          <section className="overflow-hidden rounded-xl border border-border bg-card">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[800px] text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="px-5 py-4 text-left font-medium">
+      <div className="overflow-hidden rounded-xl border bg-card">
+        {items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Package className="h-6 w-6 text-muted-foreground" />
+            </div>
+
+            <h2 className="mt-4 text-base font-semibold">
+              No inventory found
+            </h2>
+
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              {search
+                ? "No inventory items matched your search."
+                : "There are currently no inventory items."}
+            </p>
+
+            {search && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="mt-4 rounded-md border px-4 py-2 text-sm font-medium transition hover:bg-muted"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* ==================================================
+                DESKTOP TABLE
+            ================================================== */}
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead className="border-b bg-muted/40">
+                  <tr className="text-left">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       Product
                     </th>
 
-                    <th className="px-5 py-4 text-left font-medium">
-                      Color
-                    </th>
-
-                    <th className="px-5 py-4 text-left font-medium">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       SKU
                     </th>
 
-                    <th className="px-5 py-4 text-right font-medium">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
+                      Color
+                    </th>
+
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       Stock
                     </th>
 
-                    <th className="px-5 py-4 text-right font-medium">
-                      Reserved
-                    </th>
-
-                    <th className="px-5 py-4 text-right font-medium">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       Available
                     </th>
 
-                    <th className="px-5 py-4 text-left font-medium">
+                    <th className="px-6 py-4 font-medium text-muted-foreground">
                       Status
+                    </th>
+
+                    <th className="px-6 py-4 text-right font-medium text-muted-foreground">
+                      Action
                     </th>
                   </tr>
                 </thead>
 
-                <tbody>
-                  {inventory.map(
-                    (item) => {
-                      const status =
-                        getStockStatus(
-                          item.availableStock,
-                        );
+                <tbody className="divide-y">
+                  {items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="transition hover:bg-muted/30"
+                    >
+                      {/* PRODUCT */}
 
-                      return (
-                        <tr
-                          key={item.id}
-                          className="border-b border-border last:border-0 hover:bg-muted/20"
-                        >
-                          <td className="px-5 py-4">
-                            <Link
-                              href={`/admin/inventory/${item.id}`}
-                              className="font-medium hover:text-accent"
-                            >
-                              {item.product.name}
-                            </Link>
+                      <td className="px-6 py-4">
+                        <div className="font-medium">
+                          {item.product.name}
+                        </div>
 
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                              {item.product.sku}
-                            </p>
-                          </td>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {item.product.status}
+                        </div>
+                      </td>
 
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-2">
-                              {item.color.hexCode && (
-                                <span
-                                  className="h-4 w-4 rounded-full border border-border"
-                                  style={{
-                                    backgroundColor:
-                                      item.color.hexCode,
-                                  }}
-                                />
-                              )}
+                      {/* SKU */}
 
-                              <span>
-                                {item.color.name}
-                              </span>
-                            </div>
-                          </td>
+                      <td className="px-6 py-4 font-mono text-xs">
+                        {item.sku}
+                      </td>
 
-                          <td className="px-5 py-4 font-mono text-xs">
-                            {item.sku}
-                          </td>
+                      {/* COLOR */}
 
-                          <td className="px-5 py-4 text-right font-medium">
-                            {item.stock}
-                          </td>
-
-                          <td className="px-5 py-4 text-right text-muted-foreground">
-                            {item.reservedStock}
-                          </td>
-
-                          <td className="px-5 py-4 text-right font-medium">
-                            {item.availableStock}
-                          </td>
-
-                          <td className="px-5 py-4">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {item.color.hexCode && (
                             <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
-                            >
-                              {status.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    },
-                  )}
+                              className="h-4 w-4 rounded-full border"
+                              style={{
+                                backgroundColor:
+                                  item.color.hexCode,
+                              }}
+                            />
+                          )}
+
+                          <span>{item.color.name}</span>
+                        </div>
+                      </td>
+
+                      {/* STOCK */}
+
+                      <td className="px-6 py-4">
+                        {item.stock}
+                      </td>
+
+                      {/* AVAILABLE */}
+
+                      <td className="px-6 py-4 font-medium">
+                        {item.availableStock}
+                      </td>
+
+                      {/* STATUS */}
+
+                      <td className="px-6 py-4">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${getStatusClasses(
+                            item.stockStatus,
+                          )}`}
+                        >
+                          {getStatusLabel(
+                            item.stockStatus,
+                          )}
+                        </span>
+                      </td>
+
+                      {/* ACTION */}
+
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/admin/inventory/${item.id}`}
+                          className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition hover:bg-muted"
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
             {/* ==================================================
-                EMPTY STATE
+                MOBILE CARDS
             ================================================== */}
 
-            {inventory.length === 0 && (
-              <div className="p-12 text-center">
-                <Package
-                  size={28}
-                  className="mx-auto text-muted-foreground"
-                  strokeWidth={1.5}
-                />
+            <div className="divide-y md:hidden">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="space-y-4 p-5"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-medium">
+                        {item.product.name}
+                      </h3>
 
-                <p className="mt-3 font-medium">
-                  No inventory found
-                </p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">
+                        {item.sku}
+                      </p>
+                    </div>
 
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Try changing your search or filters.
-                </p>
-              </div>
-            )}
-
-            {/* ==================================================
-                PAGINATION
-            ================================================== */}
-
-            {pagination &&
-              pagination.totalPages > 1 && (
-                <div className="flex items-center justify-between border-t border-border px-5 py-4">
-                  <p className="text-sm text-muted-foreground">
-                    Page {pagination.page} of{" "}
-                    {pagination.totalPages}
-                  </p>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={
-                        !pagination.hasPreviousPage
-                      }
-                      onClick={() =>
-                        handlePage(
-                          pagination.page -
-                            1,
-                        )
-                      }
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-border disabled:cursor-not-allowed disabled:opacity-40"
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${getStatusClasses(
+                        item.stockStatus,
+                      )}`}
                     >
-                      <ChevronLeft
-                        size={16}
-                      />
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={
-                        !pagination.hasNextPage
-                      }
-                      onClick={() =>
-                        handlePage(
-                          pagination.page +
-                            1,
-                        )
-                      }
-                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-border disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <ChevronRight
-                        size={16}
-                      />
-                    </button>
+                      {getStatusLabel(
+                        item.stockStatus,
+                      )}
+                    </span>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Color
+                      </p>
+
+                      <div className="mt-1 flex items-center gap-2">
+                        {item.color.hexCode && (
+                          <span
+                            className="h-4 w-4 rounded-full border"
+                            style={{
+                              backgroundColor:
+                                item.color.hexCode,
+                            }}
+                          />
+                        )}
+
+                        <span>{item.color.name}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Stock
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {item.stock}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Reserved
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {item.reservedStock}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        Available
+                      </p>
+
+                      <p className="mt-1 font-medium">
+                        {item.availableStock}
+                      </p>
+                    </div>
+                  </div>
+
+                  <Link
+                    href={`/admin/inventory/${item.id}`}
+                    className="flex w-full items-center justify-center gap-2 rounded-md border px-4 py-2.5 text-sm font-medium transition hover:bg-muted"
+                  >
+                    <Eye className="h-4 w-4" />
+
+                    View inventory
+                  </Link>
                 </div>
-              )}
-          </section>
+              ))}
+            </div>
+          </>
         )}
+      </div>
+
+      {/* ======================================================
+          PAGINATION
+      ====================================================== */}
+
+      {pagination && pagination.totalPages > 1 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {pagination.page} of{" "}
+            {pagination.totalPages}
+          </p>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={!pagination.hasPreviousPage}
+              onClick={() =>
+                setPage((current) =>
+                  Math.max(1, current - 1),
+                )
+              }
+              className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+            >
+              <ChevronLeft className="h-4 w-4" />
+
+              Previous
+            </button>
+
+            <button
+              type="button"
+              disabled={!pagination.hasNextPage}
+              onClick={() =>
+                setPage((current) =>
+                  current + 1,
+                )
+              }
+              className="inline-flex items-center gap-1 rounded-md border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
+            >
+              Next
+
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

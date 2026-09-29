@@ -217,6 +217,12 @@ export function GetInTouch() {
                       +234 905 6066 289 / +234 911 6310 494
                     </a>
                   </div>
+                </div>
+                <div className="flex gap-5 border-b border-border py-6">
+                  <div className="flex size-11 shrink-0 items-center justify-center border border-border">
+                    <Phone className="size-4" strokeWidth={1.5} />
+                  </div>
+
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#756a60]">
                       Whatsapp

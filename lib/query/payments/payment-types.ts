@@ -28,6 +28,12 @@ export type AdminPaymentSort =
   | "amount_desc";
 
 // ============================================================
+// SALES PERIOD
+// ============================================================
+
+export type AdminSalesPeriod = 7 | 30 | 90;
+
+// ============================================================
 // CUSTOMER
 // ============================================================
 
@@ -92,6 +98,22 @@ export interface AdminPaymentPagination {
 }
 
 // ============================================================
+// SALES SUMMARY
+// ============================================================
+
+export interface AdminSalesSummary {
+  totalSales: string;
+
+  period: AdminSalesPeriod;
+
+  dailySales: Array<{
+    date: string;
+    label: string;
+    sales: string;
+  }>;
+}
+
+// ============================================================
 // PAYMENT LIST RESPONSE
 // ============================================================
 
@@ -99,6 +121,7 @@ export interface AdminPaymentsResponse {
   success: boolean;
   data: AdminPayment[];
   pagination: AdminPaymentPagination;
+  summary: AdminSalesSummary;
 }
 
 // ============================================================
@@ -148,19 +171,21 @@ export interface AdminPaymentRefund {
 
 export interface AdminPaymentDetail
   extends Omit<AdminPayment, "order"> {
-  order: (Omit<
-    AdminPaymentOrder,
-    "user"
-  > & {
-    checkoutIdempotencyKey: string;
-    userId: string | null;
-    notes: string | null;
-    user: AdminPaymentCustomer | null;
-    items: AdminPaymentOrderItem[];
-    shippingAddress:
-      | AdminPaymentShippingAddress
-      | null;
-  }) | null;
+  order: (
+    Omit<
+      AdminPaymentOrder,
+      "user"
+    > & {
+      checkoutIdempotencyKey: string;
+      userId: string | null;
+      notes: string | null;
+      user: AdminPaymentCustomer | null;
+      items: AdminPaymentOrderItem[];
+      shippingAddress:
+        | AdminPaymentShippingAddress
+        | null;
+    }
+  ) | null;
 
   refunds: AdminPaymentRefund[];
 }
@@ -186,4 +211,5 @@ export interface AdminPaymentFilters {
   provider?: string;
   paymentMethod?: AdminPaymentMethod;
   sort?: AdminPaymentSort;
+  period?: AdminSalesPeriod;
 }

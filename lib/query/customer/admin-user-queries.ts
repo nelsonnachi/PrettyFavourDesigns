@@ -1,112 +1,47 @@
+"use client";
+
+import {
+  keepPreviousData,
+  useQuery,
+} from "@tanstack/react-query";
+
+import {
+  getAdminUser,
+  getAdminUsers,
+} from "./admin-user-api";
+
+import { adminUserKeys } from "./admin-user-keys";
+
 import type {
-  AdminUserResponse,
   AdminUsersQuery,
-  AdminUsersResponse,
 } from "./admin-user-types";
-
-// ============================================================
-// API ERROR HELPER
-// ============================================================
-
-async function getApiError(
-  response: Response,
-  fallback: string,
-) {
-  try {
-    const body = await response.json();
-
-    return body?.message ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 // ============================================================
 // GET ADMIN USERS
 // ============================================================
 
-export async function getAdminUsers(
+export function useAdminUsers(
   query: AdminUsersQuery,
-): Promise<AdminUsersResponse> {
-  const searchParams = new URLSearchParams();
-
-  searchParams.set(
-    "page",
-    String(query.page),
-  );
-
-  searchParams.set(
-    "limit",
-    String(query.limit),
-  );
-
-  searchParams.set(
-    "status",
-    query.status,
-  );
-
-  searchParams.set(
-    "role",
-    query.role,
-  );
-
-  searchParams.set(
-    "sort",
-    query.sort,
-  );
-
-  if (query.search.trim()) {
-    searchParams.set(
-      "search",
-      query.search.trim(),
-    );
-  }
-
-  const response = await fetch(
-    `/api/admin/users?${searchParams.toString()}`,
-    {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      await getApiError(
-        response,
-        "Failed to fetch users",
-      ),
-    );
-  }
-
-  return response.json();
+) {
+  return useQuery({
+    queryKey: adminUserKeys.list(query),
+    queryFn: () => getAdminUsers(query),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
 }
 
 // ============================================================
 // GET SINGLE ADMIN USER
 // ============================================================
 
-export async function getAdminUser(
+export function useAdminUser(
   id: string,
-): Promise<AdminUserResponse> {
-  const response = await fetch(
-    `/api/admin/users/${id}`,
-    {
-      method: "GET",
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      await getApiError(
-        response,
-        "Failed to fetch user",
-      ),
-    );
-  }
-
-  return response.json();
+) {
+  return useQuery({
+    queryKey: adminUserKeys.detail(id),
+    queryFn: () => getAdminUser(id),
+    enabled: Boolean(id),
+    staleTime: 30_000,
+  });
 }

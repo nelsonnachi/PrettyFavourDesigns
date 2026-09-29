@@ -10,7 +10,9 @@ export const adminPaymentKeys = {
   lists: () =>
     [...adminPaymentKeys.all, "list"] as const,
 
-  list: (filters: AdminPaymentFilters) =>
+  list: (
+    filters: AdminPaymentFilters,
+  ) =>
     [
       ...adminPaymentKeys.lists(),
       filters,

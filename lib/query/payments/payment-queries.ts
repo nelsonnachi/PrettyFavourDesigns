@@ -4,10 +4,18 @@ import {
   keepPreviousData,
   useQuery,
 } from "@tanstack/react-query";
-import { AdminPaymentFilters } from "./payment-types";
-import { getAdminPayment, getAdminPayments } from "./payment-api";
+
+import {
+  getAdminPayment,
+  getAdminPayments,
+} from "./payment-api";
+
 import { adminPaymentKeys } from "./payment-keys";
 
+import type {
+  AdminPaymentFilters,
+  AdminSalesPeriod,
+} from "./payment-types";
 
 // ============================================================
 // ADMIN PAYMENTS LIST
@@ -27,6 +35,34 @@ export function useAdminPayments(
       keepPreviousData,
 
     staleTime: 30_000,
+  });
+}
+
+// ============================================================
+// ADMIN SALES SUMMARY
+// ============================================================
+
+export function useAdminSales(
+  period: AdminSalesPeriod = 7,
+) {
+  return useQuery({
+    queryKey:
+      adminPaymentKeys.list({
+        page: 1,
+        limit: 1,
+        period,
+      }),
+
+    queryFn: () =>
+      getAdminPayments({
+        page: 1,
+        limit: 1,
+        period,
+      }),
+
+    staleTime: 30_000,
+
+    refetchOnWindowFocus: false,
   });
 }
 

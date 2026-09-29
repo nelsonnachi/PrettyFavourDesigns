@@ -1,13 +1,14 @@
-
+import type {
+  AdminPaymentDetailResponse,
+  AdminPaymentFilters,
+  AdminPaymentsResponse,
+} from "./payment-types";
 
 // ============================================================
 // BASE URL
 // ============================================================
 
-import { AdminPaymentDetailResponse, AdminPaymentFilters, AdminPaymentsResponse } from "./payment-types";
-
-const PAYMENTS_API =
-  "/api/admin/payments";
+const PAYMENTS_API = "/api/admin/payments";
 
 // ============================================================
 // GET ADMIN PAYMENTS
@@ -16,8 +17,7 @@ const PAYMENTS_API =
 export async function getAdminPayments(
   filters: AdminPaymentFilters = {},
 ): Promise<AdminPaymentsResponse> {
-  const params =
-    new URLSearchParams();
+  const params = new URLSearchParams();
 
   if (filters.page !== undefined) {
     params.set(
@@ -68,8 +68,14 @@ export async function getAdminPayments(
     );
   }
 
-  const queryString =
-    params.toString();
+  if (filters.period !== undefined) {
+    params.set(
+      "period",
+      String(filters.period),
+    );
+  }
+
+  const queryString = params.toString();
 
   const url = queryString
     ? `${PAYMENTS_API}?${queryString}`
@@ -79,8 +85,7 @@ export async function getAdminPayments(
     method: "GET",
     credentials: "include",
     headers: {
-      "Content-Type":
-        "application/json",
+      "Content-Type": "application/json",
     },
     cache: "no-store",
   });
@@ -117,8 +122,7 @@ export async function getAdminPayment(
       method: "GET",
       credentials: "include",
       headers: {
-        "Content-Type":
-          "application/json",
+        "Content-Type": "application/json",
       },
       cache: "no-store",
     },

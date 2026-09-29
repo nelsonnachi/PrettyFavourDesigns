@@ -1,48 +1,109 @@
 import { NextRequest } from "next/server";
 
 import { db } from "@/db/drizzle";
+
 import { requireAdmin } from "@/lib/APIs/auth";
 import { adminPaymentFiltersSchema } from "@/lib/validations/admin-payment";
 
 export const runtime = "nodejs";
 
+type SalesPeriod = 7 | 30 | 90;
+
+function getSalesPeriod(value: string | null): SalesPeriod {
+  if (value === "30") {
+    return 30;
+  }
+
+  if (value === "90") {
+    return 90;
+  }
+
+  return 7;
+}
+
+function formatSalesLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-NG", {
+    month: "short",
+    day: "numeric",
+    timeZone: "Africa/Lagos",
+  }).format(date);
+}
+
+function getNigeriaDateKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Africa/Lagos",
+  }).format(date);
+}
+
+function getStartDate(period: SalesPeriod) {
+  const now = new Date();
+
+  const start = new Date(now);
+
+  start.setDate(start.getDate() - (period - 1));
+
+  start.setHours(0, 0, 0, 0);
+
+  return start;
+}
+
+function createDateRange(period: SalesPeriod) {
+  const dates: Date[] = [];
+
+  const today = new Date();
+
+  for (let index = period - 1; index >= 0; index--) {
+    const date = new Date(today);
+
+    date.setDate(date.getDate() - index);
+
+    dates.push(date);
+  }
+
+  return dates;
+}
+
+function parseAmount(amount: string) {
+  const value = Number(amount);
+
+  return Number.isFinite(value) ? value : 0;
+}
+
 export async function GET(req: NextRequest) {
   try {
-    // ==========================================================
+    // ========================================================
     // ADMIN AUTH
-    // ==========================================================
+    // ========================================================
 
     await requireAdmin();
 
-    // ==========================================================
-    // READ QUERY PARAMETERS
-    // ==========================================================
+    // ========================================================
+    // QUERY PARAMETERS
+    // ========================================================
 
     const searchParams = Object.fromEntries(req.nextUrl.searchParams.entries());
 
-    // ==========================================================
-    // VALIDATE QUERY PARAMETERS
-    // ==========================================================
-
     const query = adminPaymentFiltersSchema.parse(searchParams);
+
+    const period = getSalesPeriod(req.nextUrl.searchParams.get("period"));
 
     const offset = (query.page - 1) * query.limit;
 
-    // ==========================================================
-    // BUILD SEARCH FILTERS
-    // ==========================================================
+    // ========================================================
+    // BUILD PAYMENT FILTERS
+    // ========================================================
 
     const searchFilter = query.search
       ? {
           OR: [
-            // Payment reference
             {
               reference: {
                 ilike: `%${query.search}%`,
               },
             },
-
-            // Order number
             {
               order: {
                 orderNumber: {
@@ -50,8 +111,6 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
-
-            // Customer email
             {
               order: {
                 user: {
@@ -61,8 +120,6 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
-
-            // Customer first name
             {
               order: {
                 user: {
@@ -72,8 +129,6 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
-
-            // Customer last name
             {
               order: {
                 user: {
@@ -83,8 +138,6 @@ export async function GET(req: NextRequest) {
                 },
               },
             },
-
-            // Customer phone
             {
               order: {
                 user: {
@@ -98,50 +151,44 @@ export async function GET(req: NextRequest) {
         }
       : undefined;
 
-    // ==========================================================
-    // GET PAYMENTS
-    // ==========================================================
+    const paymentFilters = {
+      AND: [
+        ...(query.status
+          ? [
+              {
+                status: query.status,
+              },
+            ]
+          : []),
+
+        ...(query.provider
+          ? [
+              {
+                provider: query.provider,
+              },
+            ]
+          : []),
+
+        ...(query.paymentMethod
+          ? [
+              {
+                order: {
+                  paymentMethod: query.paymentMethod,
+                },
+              },
+            ]
+          : []),
+
+        ...(searchFilter ? [searchFilter] : []),
+      ],
+    };
+
+    // ========================================================
+    // GET PAGINATED PAYMENTS
+    // ========================================================
 
     const rows = await db.query.payments.findMany({
-      where: {
-        AND: [
-          // Payment status
-          ...(query.status
-            ? [
-                {
-                  status: query.status,
-                },
-              ]
-            : []),
-
-          // Payment provider
-          ...(query.provider
-            ? [
-                {
-                  provider: query.provider,
-                },
-              ]
-            : []),
-
-          // Order payment method
-          ...(query.paymentMethod
-            ? [
-                {
-                  order: {
-                    paymentMethod: query.paymentMethod,
-                  },
-                },
-              ]
-            : []),
-
-          // Search
-          ...(searchFilter ? [searchFilter] : []),
-        ],
-      },
-
-      // ========================================================
-      // PAYMENT COLUMNS
-      // ========================================================
+      where: paymentFilters,
 
       columns: {
         id: true,
@@ -156,10 +203,6 @@ export async function GET(req: NextRequest) {
         createdAt: true,
         updatedAt: true,
       },
-
-      // ========================================================
-      // ORDER RELATION
-      // ========================================================
 
       with: {
         order: {
@@ -177,10 +220,6 @@ export async function GET(req: NextRequest) {
             updatedAt: true,
           },
 
-          // ====================================================
-          // CUSTOMER RELATION
-          // ====================================================
-
           with: {
             user: {
               columns: {
@@ -195,10 +234,6 @@ export async function GET(req: NextRequest) {
           },
         },
       },
-
-      // ========================================================
-      // SORTING
-      // ========================================================
 
       orderBy: (payments, { asc, desc }) => {
         switch (query.sort) {
@@ -217,63 +252,16 @@ export async function GET(req: NextRequest) {
         }
       },
 
-      // ========================================================
-      // PAGINATION
-      // ========================================================
-
       limit: query.limit,
       offset,
     });
 
-    // ==========================================================
+    // ========================================================
     // GET TOTAL MATCHING PAYMENTS
-    // ==========================================================
-    //
-    // We only need IDs here.
-    // This keeps the count query simple and beginner-friendly.
-    //
-    // No db._
-    // No as any
-    // No manual joins
-    //
-    // ==========================================================
+    // ========================================================
 
     const matchingPayments = await db.query.payments.findMany({
-      where: {
-        AND: [
-          // Payment status
-          ...(query.status
-            ? [
-                {
-                  status: query.status,
-                },
-              ]
-            : []),
-
-          // Payment provider
-          ...(query.provider
-            ? [
-                {
-                  provider: query.provider,
-                },
-              ]
-            : []),
-
-          // Order payment method
-          ...(query.paymentMethod
-            ? [
-                {
-                  order: {
-                    paymentMethod: query.paymentMethod,
-                  },
-                },
-              ]
-            : []),
-
-          // Search
-          ...(searchFilter ? [searchFilter] : []),
-        ],
-      },
+      where: paymentFilters,
 
       columns: {
         id: true,
@@ -282,9 +270,72 @@ export async function GET(req: NextRequest) {
 
     const total = matchingPayments.length;
 
-    // ==========================================================
+    // ========================================================
+    // GET ALL PAID PAYMENTS
+    //
+    // This is separate from the paginated payment list.
+    // Dashboard sales must not depend on page/limit/search.
+    // ========================================================
+
+    const paidPayments = await db.query.payments.findMany({
+      where: {
+        status: "paid",
+      },
+
+      columns: {
+        amount: true,
+        paidAt: true,
+      },
+    });
+
+    // ========================================================
+    // TOTAL SALES
+    // ========================================================
+
+    const totalSales = paidPayments.reduce(
+      (total, payment) => total + parseAmount(payment.amount),
+      0,
+    );
+
+    // ========================================================
+    // DAILY SALES
+    // ========================================================
+
+    const startDate = getStartDate(period);
+
+    const dailySalesMap = new Map<string, number>();
+
+    for (const payment of paidPayments) {
+      if (!payment.paidAt) {
+        continue;
+      }
+
+      if (payment.paidAt < startDate) {
+        continue;
+      }
+
+      const dateKey = getNigeriaDateKey(payment.paidAt);
+
+      const current = dailySalesMap.get(dateKey) ?? 0;
+
+      dailySalesMap.set(dateKey, current + parseAmount(payment.amount));
+    }
+
+    const dailySales = createDateRange(period).map((date) => {
+      const dateKey = getNigeriaDateKey(date);
+
+      return {
+        date: dateKey,
+
+        label: formatSalesLabel(date),
+
+        sales: String(dailySalesMap.get(dateKey) ?? 0),
+      };
+    });
+
+    // ========================================================
     // RESPONSE
-    // ==========================================================
+    // ========================================================
 
     return Response.json({
       success: true,
@@ -297,6 +348,14 @@ export async function GET(req: NextRequest) {
         total,
         totalPages: Math.ceil(total / query.limit),
       },
+
+      summary: {
+        totalSales: String(totalSales),
+
+        period,
+
+        dailySales,
+      },
     });
   } catch (error) {
     console.error("GET /api/admin/payments error:", error);
@@ -304,6 +363,7 @@ export async function GET(req: NextRequest) {
     return Response.json(
       {
         success: false,
+
         message:
           error instanceof Error ? error.message : "Failed to fetch payments",
       },

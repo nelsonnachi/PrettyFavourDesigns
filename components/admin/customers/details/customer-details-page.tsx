@@ -17,8 +17,8 @@ import { CustomerMessages } from "./customer-messages";
 import { CustomerInventory } from "./customer-inventory";
 import { CustomerAccountActions } from "./customer-account-actions";
 import { adminUserKeys } from "@/lib/query/customer/admin-user-keys";
-import { getAdminUser } from "@/lib/query/customer/admin-user-queries";
 import { CustomerRatings } from "./customer-rating";
+import { getAdminUser } from "@/lib/query/customer/admin-user-api";
 
 type CustomerDetailsPageProps = {
   id: string;

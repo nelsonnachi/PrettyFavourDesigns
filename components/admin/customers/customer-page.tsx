@@ -10,7 +10,7 @@ import { CustomerTable } from "./customer-table";
 import { CustomerPagination } from "./customer-pagination";
 import { AdminUsersQuery } from "@/lib/query/customer/admin-user-types";
 import { adminUserKeys } from "@/lib/query/customer/admin-user-keys";
-import { getAdminUsers } from "@/lib/query/customer/admin-user-queries";
+import { getAdminUsers } from "@/lib/query/customer/admin-user-api";
 
 const DEFAULT_QUERY: AdminUsersQuery = {
   page: 1,

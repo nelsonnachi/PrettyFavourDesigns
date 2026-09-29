@@ -3,13 +3,13 @@ const journey = [
     year: "The beginning",
     title: "An idea becomes a brand",
     description:
-      "We began with a simple ambition: to make everyday products that combine practical function with a strong sense of style.",
+      "SHOPPFD was born from a simple need that turned into a passion. I needed a bag i couldn't afford, so i decided to create one myself.",
   },
   {
     year: "The first collection",
     title: "Finding our identity",
     description:
-      "Our early collections helped define what we stand for — clean silhouettes, thoughtful details, and pieces made for everyday life.",
+      "With a thought saying, 'Why not try making one yourself?. i created my first bad from scratch - and to my surprise it came out beautiful and our identity was born.' ",
   },
   {
     year: "Today",

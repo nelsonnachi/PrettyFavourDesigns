@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Box,
   ShoppingBag,
@@ -12,34 +14,69 @@ import { TopProducts } from "@/components/admin/dashboard/TopProducts";
 import { RecentOrders } from "@/components/admin/dashboard/RecentOrders";
 import { LowStockAlert } from "@/components/admin/dashboard/LowStockAlert";
 
-const stats = [
-  {
-    title: "Total Sales",
-    value: "₦2,482,500",
-    change: "12%",
-    icon: Wallet,
-  },
-  {
-    title: "Orders",
-    value: "48",
-    change: "8%",
-    icon: ShoppingBag,
-  },
-  {
-    title: "Products",
-    value: "24",
-    change: "4%",
-    icon: Box,
-  },
-  {
-    title: "Customers",
-    value: "36",
-    change: "15%",
-    icon: Users,
-  },
-];
+import { useAdminOrders } from "@/lib/query/orders/order-queries";
+import { useAdminProducts } from "@/lib/query/products/product-queries";
 
 export default function AdminDashboardPage() {
+  // ==========================================================
+  // ORDERS
+  // ==========================================================
+
+  const ordersQuery = useAdminOrders({
+    page: 1,
+    limit: 1,
+  });
+
+  const totalOrders =
+    ordersQuery.data?.data.pagination.total ?? 0;
+
+  // ==========================================================
+  // PRODUCTS
+  // ==========================================================
+
+  const productsQuery = useAdminProducts({
+    page: 1,
+    limit: 1,
+  });
+
+  const totalProducts =
+    productsQuery.data?.pagination.total ?? 0;
+
+  // ==========================================================
+  // DASHBOARD STATS
+  // ==========================================================
+
+  const stats = [
+    {
+      title: "Total Sales",
+      value: "₦2,482,500",
+      icon: Wallet,
+    },
+    {
+      title: "Orders",
+      value: ordersQuery.isLoading
+        ? "..."
+        : ordersQuery.isError
+          ? "—"
+          : totalOrders.toLocaleString("en-NG"),
+      icon: ShoppingBag,
+    },
+    {
+      title: "Products",
+      value: productsQuery.isLoading
+        ? "..."
+        : productsQuery.isError
+          ? "—"
+          : totalProducts.toLocaleString("en-NG"),
+      icon: Box,
+    },
+    {
+      title: "Customers",
+      value: "36",
+      icon: Users,
+    },
+  ];
+
   return (
     <div className="space-y-7">
       {/* Heading */}
@@ -60,7 +97,6 @@ export default function AdminDashboardPage() {
             key={stat.title}
             title={stat.title}
             value={stat.value}
-            change={stat.change}
             icon={stat.icon}
           />
         ))}

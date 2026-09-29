@@ -1,19 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { ArrowUpRight } from "lucide-react";
 
 interface StatCardProps {
   title: string;
   value: string;
-  change: string;
-  description?: string;
   icon: LucideIcon;
 }
 
 export function StatCard({
   title,
   value,
-  change,
-  description = "vs. last 7 days",
   icon: Icon,
 }: StatCardProps) {
   return (
@@ -28,20 +23,9 @@ export function StatCard({
         {title}
       </p>
 
-      <div className="mt-1 flex items-end justify-between gap-3">
-        <h2 className="font-serif text-3xl tracking-tight">
-          {value}
-        </h2>
-
-        <span className="flex items-center gap-0.5 text-xs font-medium text-green-600">
-          <ArrowUpRight size={13} />
-          {change}
-        </span>
-      </div>
-
-      <p className="mt-1 text-xs text-muted-foreground">
-        {description}
-      </p>
+      <h2 className="mt-1 font-serif text-3xl tracking-tight">
+        {value}
+      </h2>
     </div>
   );
 }

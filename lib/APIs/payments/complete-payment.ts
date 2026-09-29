@@ -6,6 +6,7 @@ import {
   payments,
   orders,
   orderItems,
+  products,
   productVariants,
   inventoryMovements,
 } from "@/db/schema";
@@ -63,8 +64,7 @@ export async function completeSuccessfulPayment({
         .where(eq(orders.id, payment.orderId))
         .limit(1);
 
-      const existingOrder =
-        existingOrderResult[0];
+      const existingOrder = existingOrderResult[0];
 
       if (!existingOrder) {
         throw new ApiError(
@@ -152,10 +152,25 @@ export async function completeSuccessfulPayment({
     }
 
     // ========================================================
-    // 8. PROCESS INVENTORY
+    // 8. PROCESS INVENTORY + SALES
     // ========================================================
 
     for (const item of items) {
+      // ------------------------------------------------------
+      // PRODUCT
+      // ------------------------------------------------------
+
+      if (!item.productId) {
+        throw new ApiError(
+          `Product associated with "${item.productName}" no longer exists`,
+          400,
+        );
+      }
+
+      // ------------------------------------------------------
+      // VARIANT
+      // ------------------------------------------------------
+
       if (!item.variantId) {
         throw new ApiError(
           `No product variant was specified for "${item.productName}"`,
@@ -210,6 +225,30 @@ export async function completeSuccessfulPayment({
       }
 
       // ------------------------------------------------------
+      // INCREMENT PRODUCT SOLD COUNT
+      // ------------------------------------------------------
+
+      const updatedProductResult = await tx
+        .update(products)
+        .set({
+          soldCount: sql`
+            ${products.soldCount}
+            + ${item.quantity}
+          `,
+
+          updatedAt: new Date(),
+        })
+        .where(eq(products.id, item.productId))
+        .returning();
+
+      if (updatedProductResult.length === 0) {
+        throw new ApiError(
+          `Failed to update sold count for "${item.productName}"`,
+          500,
+        );
+      }
+
+      // ------------------------------------------------------
       // INVENTORY MOVEMENT
       // ------------------------------------------------------
 
@@ -246,8 +285,7 @@ export async function completeSuccessfulPayment({
       .where(eq(payments.id, payment.id))
       .returning();
 
-    const updatedPayment =
-      paymentUpdateResult[0];
+    const updatedPayment = paymentUpdateResult[0];
 
     if (!updatedPayment) {
       throw new ApiError(
@@ -272,8 +310,7 @@ export async function completeSuccessfulPayment({
       .where(eq(orders.id, order.id))
       .returning();
 
-    const updatedOrder =
-      orderUpdateResult[0];
+    const updatedOrder = orderUpdateResult[0];
 
     if (!updatedOrder) {
       throw new ApiError(

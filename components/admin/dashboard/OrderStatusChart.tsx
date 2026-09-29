@@ -8,24 +8,85 @@ import {
   Tooltip,
 } from "recharts";
 
-const data = [
-  { name: "Delivered", value: 28 },
-  { name: "Processing", value: 12 },
-  { name: "Shipped", value: 5 },
-  { name: "Cancelled", value: 3 },
-];
+import { useAdminOrders } from "@/lib/query/orders/order-queries";
 
 const colors = [
   "var(--accent)",
   "#f2a36f",
   "var(--secondary)",
   "var(--primary)",
+  "#94a3b8",
 ];
 
 export function OrderStatusChart() {
+  const deliveredQuery = useAdminOrders({
+    page: 1,
+    limit: 1,
+    status: "delivered",
+  });
+
+  const processingQuery = useAdminOrders({
+    page: 1,
+    limit: 1,
+    status: "processing",
+  });
+
+  const shippedQuery = useAdminOrders({
+    page: 1,
+    limit: 1,
+    status: "shipped",
+  });
+
+  const cancelledQuery = useAdminOrders({
+    page: 1,
+    limit: 1,
+    status: "cancelled",
+  });
+
+  const pendingQuery = useAdminOrders({
+    page: 1,
+    limit: 1,
+    status: "pending",
+  });
+
+  const data = [
+    {
+      name: "Delivered",
+      value:
+        deliveredQuery.data?.data.pagination.total ?? 0,
+    },
+    {
+      name: "Processing",
+      value:
+        processingQuery.data?.data.pagination.total ?? 0,
+    },
+    {
+      name: "Shipped",
+      value:
+        shippedQuery.data?.data.pagination.total ?? 0,
+    },
+    {
+      name: "Cancelled",
+      value:
+        cancelledQuery.data?.data.pagination.total ?? 0,
+    },
+    {
+      name: "Pending",
+      value:
+        pendingQuery.data?.data.pagination.total ?? 0,
+    },
+  ];
+
+  const isLoading =
+    deliveredQuery.isLoading ||
+    processingQuery.isLoading ||
+    shippedQuery.isLoading ||
+    cancelledQuery.isLoading ||
+    pendingQuery.isLoading;
+
   const total = data.reduce(
     (sum, item) => sum + item.value,
-    0
+    0,
   );
 
   return (
@@ -67,7 +128,7 @@ export function OrderStatusChart() {
 
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="font-serif text-2xl">
-            {total}
+            {isLoading ? "..." : total.toLocaleString()}
           </span>
 
           <span className="text-[11px] text-muted-foreground">
@@ -94,7 +155,9 @@ export function OrderStatusChart() {
             </span>
 
             <span className="font-medium">
-              {item.value}
+              {isLoading
+                ? "..."
+                : item.value.toLocaleString()}
             </span>
           </div>
         ))}

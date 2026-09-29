@@ -18,7 +18,7 @@ export function BrandStory() {
 
             <div className="mt-8 space-y-6 text-sm leading-8 text-[#756a60] sm:text-base">
               <p>
-                I needed a bag, but i couldn't afford the one I wanted. So i thought, "Why not try making one myself?." With no idea that it would grow into a business, I created my first bag from scratch - and to my surprise, it came out beautifully. 
+                I needed a bag, but I couldn't afford the one I wanted. So I thought, "Why not try making one myself?." With no idea that it would grow into a business, I created my first bag from scratch - and to my surprise, it came out beautifully. 
               </p>
 
               <p>
@@ -26,7 +26,7 @@ export function BrandStory() {
               </p>
 
               <p>
-                As the demand grew i knew i needed to improve my skills and take my craft more seriously. I invested in learning, upgraded my skill and continued exploring new designs and tenchniques. That simple decision to make a bag for myself became the beginning of PrettyFavourDesigns which subletted into what's known today as SHOPPFD.
+                As the demand grew, I knew I needed to improve my skills and take my craft more seriously. I invested in learning, upgraded my skill and continued exploring new designs and tenchniques. That simple decision to make a bag for myself became the beginning of PrettyFavourDesigns which subletted into what's known today as SHOPPFD.
               </p>
 
               <p>

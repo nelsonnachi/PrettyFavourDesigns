@@ -2,11 +2,8 @@ import { NextRequest } from "next/server";
 
 import {
   and,
-  asc,
-  desc,
   eq,
   ilike,
-  type SQL,
 } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
@@ -43,70 +40,158 @@ export async function GET(
   req: NextRequest,
 ) {
   try {
-    // ========================================================
-    // REQUIRE ADMIN
-    // ========================================================
-
     await requireAdmin();
-
-    // ========================================================
-    // QUERY PARAMETERS
-    // ========================================================
 
     const searchParams =
       req.nextUrl.searchParams;
 
+    // ==========================================================
+    // PAGINATION
+    // ==========================================================
+
+    const rawPage = Number(
+      searchParams.get("page"),
+    );
+
+    const rawLimit = Number(
+      searchParams.get("limit"),
+    );
+
     const page = Math.max(
-      Number(
-        searchParams.get("page"),
-      ) || 1,
+      Number.isFinite(rawPage)
+        ? rawPage
+        : 1,
       1,
     );
 
     const limit = Math.min(
       Math.max(
-        Number(
-          searchParams.get("limit"),
-        ) || 10,
+        Number.isFinite(rawLimit)
+          ? rawLimit
+          : 10,
         1,
       ),
       100,
     );
+
+    const offset =
+      (page - 1) * limit;
+
+    // ==========================================================
+    // SEARCH
+    // ==========================================================
 
     const search =
       searchParams
         .get("search")
         ?.trim() || undefined;
 
+    // ==========================================================
+    // SUBSCRIPTION STATUS
+    // ==========================================================
+
     const isSubscribedParam =
       searchParams.get(
         "isSubscribed",
       );
 
-    const isSubscribed =
-      isSubscribedParam === null
-        ? undefined
-        : isSubscribedParam === "true";
+    let isSubscribed:
+      | boolean
+      | undefined;
+
+    if (
+      isSubscribedParam === "true"
+    ) {
+      isSubscribed = true;
+    } else if (
+      isSubscribedParam === "false"
+    ) {
+      isSubscribed = false;
+    }
+
+    // ==========================================================
+    // SORT
+    // ==========================================================
 
     const sort =
-      searchParams.get("sort") ||
-      "newest";
+      searchParams.get("sort") ===
+      "oldest"
+        ? "oldest"
+        : "newest";
 
-    const offset =
-      (page - 1) * limit;
+    // ==========================================================
+    // RELATIONS V2 WHERE
+    //
+    // IMPORTANT:
+    //
+    // db.query.* uses the Relations v2 object syntax.
+    //
+    // Do NOT create:
+    //
+    // const whereCondition = and(...)
+    //
+    // and then pass that SQL object to db.query.
+    // ==========================================================
 
-    // ========================================================
-    // CONDITIONS
-    // ========================================================
+    const where = {
+      ...(search
+        ? {
+            email: {
+              ilike: `%${search}%`,
+            },
+          }
+        : {}),
 
-    const conditions: SQL[] = [];
+      ...(isSubscribed !== undefined
+        ? {
+            isSubscribed,
+          }
+        : {}),
+    };
 
-    // ========================================================
-    // SEARCH
-    // ========================================================
+    // ==========================================================
+    // GET SUBSCRIBERS
+    //
+    // DRIZZLE RELATIONS V2
+    // ==========================================================
+
+    const subscribers =
+      await db.query.newsletterSubscribers.findMany(
+        {
+          where,
+
+          columns: {
+            id: true,
+            email: true,
+            isSubscribed: true,
+            subscribedAt: true,
+            unsubscribedAt: true,
+          },
+
+          orderBy: {
+            subscribedAt:
+              sort === "oldest"
+                ? "asc"
+                : "desc",
+          },
+
+          limit,
+
+          offset,
+        },
+      );
+
+    // ==========================================================
+    // COUNT
+    //
+    // $count() uses the SQL query builder, so SQL conditions
+    // are correct here.
+    // ==========================================================
+
+    const countConditions = [];
 
     if (search) {
-      conditions.push(
+      countConditions.push(
         ilike(
           newsletterSubscribers.email,
           `%${search}%`,
@@ -114,15 +199,10 @@ export async function GET(
       );
     }
 
-    // ========================================================
-    // SUBSCRIPTION STATUS
-    // ========================================================
-
     if (
-      isSubscribed !==
-      undefined
+      isSubscribed !== undefined
     ) {
-      conditions.push(
+      countConditions.push(
         eq(
           newsletterSubscribers.isSubscribed,
           isSubscribed,
@@ -130,73 +210,20 @@ export async function GET(
       );
     }
 
-    // ========================================================
-    // WHERE
-    // ========================================================
-
-    const whereCondition =
-      conditions.length > 0
-        ? and(...conditions)
+    const countWhere =
+      countConditions.length > 0
+        ? and(...countConditions)
         : undefined;
-
-    // ========================================================
-    // ORDER
-    // ========================================================
-
-    const orderBy =
-      sort === "oldest"
-        ? asc(
-            newsletterSubscribers.subscribedAt,
-          )
-        : desc(
-            newsletterSubscribers.subscribedAt,
-          );
-
-    // ========================================================
-    // GET SUBSCRIBERS
-    // ========================================================
-
-    const subscribers =
-      await db
-        .select({
-          id:
-            newsletterSubscribers.id,
-
-          email:
-            newsletterSubscribers.email,
-
-          isSubscribed:
-            newsletterSubscribers.isSubscribed,
-
-          subscribedAt:
-            newsletterSubscribers.subscribedAt,
-
-          unsubscribedAt:
-            newsletterSubscribers.unsubscribedAt,
-        })
-        .from(
-          newsletterSubscribers,
-        )
-        .where(
-          whereCondition,
-        )
-        .orderBy(orderBy)
-        .limit(limit)
-        .offset(offset);
-
-    // ========================================================
-    // COUNT
-    // ========================================================
 
     const total =
       await db.$count(
         newsletterSubscribers,
-        whereCondition,
+        countWhere,
       );
 
-    // ========================================================
+    // ==========================================================
     // RESPONSE
-    // ========================================================
+    // ==========================================================
 
     return Response.json({
       success: true,
@@ -205,9 +232,7 @@ export async function GET(
 
       pagination: {
         page,
-
         limit,
-
         total,
 
         totalPages:

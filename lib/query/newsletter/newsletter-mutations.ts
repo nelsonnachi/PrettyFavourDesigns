@@ -12,13 +12,11 @@ import {
 
 import { newsletterKeys } from "./newsletter-keys";
 
-// ============================================================
-// PUBLIC NEWSLETTER
-// ============================================================
-
-// ------------------------------------------------------------
-// SUBSCRIBE
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * PUBLIC — SUBSCRIBE
+ * ============================================================
+ */
 
 export function useSubscribeToNewsletter() {
   const queryClient = useQueryClient();
@@ -34,9 +32,11 @@ export function useSubscribeToNewsletter() {
   });
 }
 
-// ------------------------------------------------------------
-// UNSUBSCRIBE
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * PUBLIC — UNSUBSCRIBE
+ * ============================================================
+ */
 
 export function useUnsubscribeFromNewsletter() {
   const queryClient = useQueryClient();
@@ -52,13 +52,11 @@ export function useUnsubscribeFromNewsletter() {
   });
 }
 
-// ============================================================
-// ADMIN NEWSLETTER
-// ============================================================
-
-// ------------------------------------------------------------
-// UPDATE SUBSCRIBER
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * ADMIN — UPDATE SUBSCRIPTION STATUS
+ * ============================================================
+ */
 
 export function useUpdateAdminNewsletterSubscriber() {
   const queryClient = useQueryClient();
@@ -77,32 +75,33 @@ export function useUpdateAdminNewsletterSubscriber() {
       ),
 
     onSuccess: (response, variables) => {
-      // Refresh all admin subscriber lists
-      queryClient.invalidateQueries({
-        queryKey: newsletterKeys.adminLists(),
-      });
+      const updatedSubscriber = response.data;
 
-      // Refresh this subscriber's detail
-      queryClient.invalidateQueries({
-        queryKey: newsletterKeys.adminDetail(
-          variables.id,
-        ),
-      });
-
-      // Update the cached detail
+      /**
+       * Update the detail cache immediately.
+       */
       queryClient.setQueryData(
         newsletterKeys.adminDetail(
           variables.id,
         ),
-        response,
+        updatedSubscriber,
       );
+
+      /**
+       * Refresh all admin lists.
+       */
+      queryClient.invalidateQueries({
+        queryKey: newsletterKeys.adminLists(),
+      });
     },
   });
 }
 
-// ------------------------------------------------------------
-// DELETE SUBSCRIBER
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * ADMIN — DELETE
+ * ============================================================
+ */
 
 export function useDeleteAdminNewsletterSubscriber() {
   const queryClient = useQueryClient();
@@ -112,14 +111,19 @@ export function useDeleteAdminNewsletterSubscriber() {
       deleteAdminNewsletterSubscriber,
 
     onSuccess: (_, id) => {
-      // Refresh all admin lists
-      queryClient.invalidateQueries({
-        queryKey: newsletterKeys.adminLists(),
+      /**
+       * Remove the subscriber detail cache.
+       */
+      queryClient.removeQueries({
+        queryKey:
+          newsletterKeys.adminDetail(id),
       });
 
-      // Remove deleted subscriber detail
-      queryClient.removeQueries({
-        queryKey: newsletterKeys.adminDetail(id),
+      /**
+       * Refresh admin subscriber lists.
+       */
+      queryClient.invalidateQueries({
+        queryKey: newsletterKeys.adminLists(),
       });
     },
   });

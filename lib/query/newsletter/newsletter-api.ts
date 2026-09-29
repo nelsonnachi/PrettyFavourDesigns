@@ -10,26 +10,23 @@ import type {
   UnsubscribeNewsletterResponse,
 } from "./newsletter-types";
 
-// ============================================================
-// HELPERS
-// ============================================================
+/**
+ * ============================================================
+ * SEARCH PARAMS
+ * ============================================================
+ */
 
 function buildNewsletterSearchParams(
   filters: NewsletterFilters,
 ) {
   const params = new URLSearchParams();
 
-  // ==========================================================
-  // SEARCH
-  // ==========================================================
-
-  if (filters.search) {
-    params.set("search", filters.search);
+  if (filters.search?.trim()) {
+    params.set(
+      "search",
+      filters.search.trim(),
+    );
   }
-
-  // ==========================================================
-  // SUBSCRIPTION STATUS
-  // ==========================================================
 
   if (filters.isSubscribed !== undefined) {
     params.set(
@@ -38,81 +35,77 @@ function buildNewsletterSearchParams(
     );
   }
 
-  // ==========================================================
-  // PAGINATION
-  // ==========================================================
-
   if (filters.page !== undefined) {
-    params.set("page", String(filters.page));
+    params.set(
+      "page",
+      String(filters.page),
+    );
   }
 
   if (filters.limit !== undefined) {
-    params.set("limit", String(filters.limit));
+    params.set(
+      "limit",
+      String(filters.limit),
+    );
   }
 
-  // ==========================================================
-  // SORT
-  // ==========================================================
-
   if (filters.sort) {
-    params.set("sort", filters.sort);
+    params.set(
+      "sort",
+      filters.sort,
+    );
   }
 
   return params;
 }
 
-// ============================================================
-// PUBLIC NEWSLETTER
-// ============================================================
-
-// ------------------------------------------------------------
-// SUBSCRIBE
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * PUBLIC — SUBSCRIBE
+ * ============================================================
+ */
 
 export async function subscribeToNewsletter(
   email: string,
-) {
+): Promise<SubscribeNewsletterResponse> {
   return apiClient<SubscribeNewsletterResponse>(
     "/api/newsletter",
     {
       method: "POST",
-      body: JSON.stringify({
-        email,
-      }),
+      body: JSON.stringify({ email }),
     },
   );
 }
 
-// ------------------------------------------------------------
-// UNSUBSCRIBE
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * PUBLIC — UNSUBSCRIBE
+ * ============================================================
+ */
 
 export async function unsubscribeFromNewsletter(
   email: string,
-) {
+): Promise<UnsubscribeNewsletterResponse> {
   return apiClient<UnsubscribeNewsletterResponse>(
     "/api/newsletter/unsubscribe",
     {
       method: "POST",
-      body: JSON.stringify({
-        email,
-      }),
+      body: JSON.stringify({ email }),
     },
   );
 }
 
-// ============================================================
-// ADMIN NEWSLETTER
-// ============================================================
-
-// ------------------------------------------------------------
-// GET ALL SUBSCRIBERS
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * ADMIN — LIST
+ * ============================================================
+ */
 
 export async function getAdminNewsletterSubscribers(
   filters: NewsletterFilters = {},
-) {
-  const params = buildNewsletterSearchParams(filters);
+): Promise<AdminNewsletterListResponse> {
+  const params =
+    buildNewsletterSearchParams(filters);
 
   const queryString = params.toString();
 
@@ -120,29 +113,35 @@ export async function getAdminNewsletterSubscribers(
     ? `/api/admin/newsletter?${queryString}`
     : "/api/admin/newsletter";
 
-  return apiClient<AdminNewsletterListResponse>(url);
+  return apiClient<AdminNewsletterListResponse>(
+    url,
+  );
 }
 
-// ------------------------------------------------------------
-// GET SINGLE SUBSCRIBER
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * ADMIN — DETAIL
+ * ============================================================
+ */
 
 export async function getAdminNewsletterSubscriber(
   id: string,
-) {
+): Promise<AdminNewsletterDetailResponse> {
   return apiClient<AdminNewsletterDetailResponse>(
     `/api/admin/newsletter/${id}`,
   );
 }
 
-// ------------------------------------------------------------
-// UPDATE SUBSCRIBER
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * ADMIN — UPDATE
+ * ============================================================
+ */
 
 export async function updateAdminNewsletterSubscriber(
   id: string,
   isSubscribed: boolean,
-) {
+): Promise<AdminNewsletterUpdateResponse> {
   return apiClient<AdminNewsletterUpdateResponse>(
     `/api/admin/newsletter/${id}`,
     {
@@ -154,13 +153,15 @@ export async function updateAdminNewsletterSubscriber(
   );
 }
 
-// ------------------------------------------------------------
-// DELETE SUBSCRIBER
-// ------------------------------------------------------------
+/**
+ * ============================================================
+ * ADMIN — DELETE
+ * ============================================================
+ */
 
 export async function deleteAdminNewsletterSubscriber(
   id: string,
-) {
+): Promise<AdminNewsletterDeleteResponse> {
   return apiClient<AdminNewsletterDeleteResponse>(
     `/api/admin/newsletter/${id}`,
     {

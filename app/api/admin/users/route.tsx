@@ -1,288 +1,125 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
-import { and, asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
-
+import { and, eq, ilike, or, type SQL } from "drizzle-orm";
 import { db } from "@/db/drizzle";
-
 import { users } from "@/db/schema/users";
-import { orders } from "@/db/schema/orders";
+import { requireAdmin, requireSuperAdmin } from "@/lib/APIs/auth";
 
-import { requireAdmin } from "@/lib/APIs/auth";
-
-import { handleApiError } from "@/lib/APIs/api-errors";
-
-import { adminUsersQuerySchema } from "@/lib/validations";
-
-// ============================================================
-// GET ADMIN USERS
-// ============================================================
+import { ApiError } from "@/lib/APIs/api-errors";
+import { adminUsersQuerySchema, createUserSchema } from "@/lib/validations";
 
 export async function GET(request: NextRequest) {
   try {
-    // ========================================================
-    // 1. REQUIRE ADMIN
-    // ========================================================
-
     await requireAdmin();
 
-    // ========================================================
-    // 2. GET QUERY PARAMETERS
-    // ========================================================
+    const params = Object.fromEntries(request.nextUrl.searchParams.entries());
+    const query = adminUsersQuerySchema.parse(params);
 
-    const searchParams = request.nextUrl.searchParams;
+    const offset = (query.page - 1) * query.limit;
+    const search = query.search ? `%${query.search}%` : null;
 
-    const query = {
-      page: searchParams.get("page") ?? undefined,
-
-      limit: searchParams.get("limit") ?? undefined,
-
-      search: searchParams.get("search") ?? "",
-
-      status: searchParams.get("status") ?? undefined,
-
-      role: searchParams.get("role") ?? undefined,
-
-      sort: searchParams.get("sort") ?? undefined,
+    // ----------------------------------------------------------
+    // WHERE (RQB v2 object syntax) -> used by findMany
+    // ----------------------------------------------------------
+    const where = {
+      ...(query.status === "active" && { isBanned: false }),
+      ...(query.status === "banned" && { isBanned: true }),
+      ...(query.role !== "all" && { role: query.role }),
+      ...(search && {
+        OR: [
+          { email: { ilike: search } },
+          { firstName: { ilike: search } },
+          { lastName: { ilike: search } },
+          { phone: { ilike: search } },
+        ],
+      }),
     };
 
-    // ========================================================
-    // 3. VALIDATE QUERY PARAMETERS
-    // ========================================================
+    // ----------------------------------------------------------
+    // Same filters as SQL -> used by db.$count (not part of RQB)
+    // ----------------------------------------------------------
+    const conditions: (SQL | undefined)[] = [];
 
-    const data = adminUsersQuerySchema.parse(query);
-
-    // ========================================================
-    // 4. PAGINATION
-    // ========================================================
-
-    const offset = (data.page - 1) * data.limit;
-
-    // ========================================================
-    // 5. BUILD FILTERS
-    // ========================================================
-
-    const filters = [];
-
-    // ========================================================
-    // SEARCH
-    // ========================================================
-
-    if (data.search) {
-      const searchTerm = `%${data.search}%`;
-
-      filters.push(
+    if (query.status === "active") conditions.push(eq(users.isBanned, false));
+    if (query.status === "banned") conditions.push(eq(users.isBanned, true));
+    if (query.role !== "all") conditions.push(eq(users.role, query.role));
+    if (search) {
+      conditions.push(
         or(
-          ilike(users.email, searchTerm),
-
-          ilike(users.firstName, searchTerm),
-
-          ilike(users.lastName, searchTerm),
-
-          ilike(users.phone, searchTerm),
-
-          sql`
-            concat(
-              coalesce(${users.firstName}, ''),
-              ' ',
-              coalesce(${users.lastName}, '')
-            ) ILIKE ${searchTerm}
-          `,
+          ilike(users.email, search),
+          ilike(users.firstName, search),
+          ilike(users.lastName, search),
+          ilike(users.phone, search),
         ),
       );
     }
 
-    // ========================================================
-    // STATUS
-    // ========================================================
+    // ----------------------------------------------------------
+    // ORDER BY (object syntax; key order = priority)
+    // ----------------------------------------------------------
+    const orderByMap = {
+      newest: { createdAt: "desc" },
+      oldest: { createdAt: "asc" },
+      name_asc: { firstName: "asc", lastName: "asc" },
+      name_desc: { firstName: "desc", lastName: "desc" },
+    } as const;
 
-    if (data.status === "active") {
-      filters.push(eq(users.isBanned, false));
-    }
+    const orderBy = orderByMap[query.sort];
 
-    if (data.status === "banned") {
-      filters.push(eq(users.isBanned, true));
-    }
-
-    // ========================================================
-    // ROLE
-    // ========================================================
-
-    if (data.role !== "all") {
-      filters.push(eq(users.role, data.role));
-    }
-
-    // ========================================================
-    // COMBINE FILTERS
-    // ========================================================
-
-    const whereCondition = filters.length > 0 ? and(...filters) : undefined;
-
-    // ========================================================
-    // 6. GET TOTAL USER COUNT
-    // ========================================================
-
-    const countResult = await db
-      .select({
-        count: count(users.id),
-      })
-      .from(users)
-      .where(whereCondition);
-
-    const total = Number(countResult[0]?.count ?? 0);
-
-    // ========================================================
-    // 7. SORTING
-    // ========================================================
-
-    let orderBy;
-
-    switch (data.sort) {
-      case "oldest":
-        orderBy = asc(users.createdAt);
-        break;
-
-      case "name_asc":
-        orderBy = asc(
-          sql`
-            concat(
-              coalesce(${users.firstName}, ''),
-              ' ',
-              coalesce(${users.lastName}, '')
-            )
-          `,
-        );
-        break;
-
-      case "name_desc":
-        orderBy = desc(
-          sql`
-            concat(
-              coalesce(${users.firstName}, ''),
-              ' ',
-              coalesce(${users.lastName}, '')
-            )
-          `,
-        );
-        break;
-
-      case "newest":
-      default:
-        orderBy = desc(users.createdAt);
-        break;
-    }
-
-    // ========================================================
-    // 8. GET USERS
-    // ========================================================
-
-    const result = await db
-      .select({
-        id: users.id,
-
-        email: users.email,
-
-        firstName: users.firstName,
-
-        lastName: users.lastName,
-
-        imageUrl: users.imageUrl,
-
-        phone: users.phone,
-
-        role: users.role,
-
-        isBanned: users.isBanned,
-
-        createdAt: users.createdAt,
-
-        updatedAt: users.updatedAt,
-
-        orderCount: count(orders.id),
-
-        totalSpent: sql<string>`
-            coalesce(
-              sum(${orders.total}),
-              0
-            )
-          `,
-      })
-
-      .from(users)
-
-      .leftJoin(orders, eq(orders.userId, users.id))
-
-      .where(whereCondition)
-
-      .groupBy(users.id)
-
-      .orderBy(orderBy)
-
-      .limit(data.limit)
-
-      .offset(offset);
-
-    // ========================================================
-    // 9. PAGINATION
-    // ========================================================
-
-    const totalPages = Math.ceil(total / data.limit);
-
-    // ========================================================
-    // 10. FORMAT USERS
-    // ========================================================
-
-    const formattedUsers = result.map((user) => ({
-      id: user.id,
-
-      email: user.email,
-
-      firstName: user.firstName,
-
-      lastName: user.lastName,
-
-      imageUrl: user.imageUrl,
-
-      phone: user.phone,
-
-      role: user.role,
-
-      isBanned: user.isBanned,
-
-      createdAt: user.createdAt,
-
-      updatedAt: user.updatedAt,
-
-      orderCount: Number(user.orderCount),
-
-      totalSpent: user.totalSpent ?? "0",
-    }));
-
-    // ========================================================
-    // 11. RETURN RESPONSE
-    // ========================================================
-
-    return NextResponse.json({
-      success: true,
-
-      data: {
-        users: formattedUsers,
-
-        pagination: {
-          page: data.page,
-
-          limit: data.limit,
-
-          total,
-
-          totalPages,
-
-          hasNextPage: data.page < totalPages,
-
-          hasPreviousPage: data.page > 1,
+    // ----------------------------------------------------------
+    // FETCH
+    // ----------------------------------------------------------
+    const [data, total] = await Promise.all([
+      db.query.users.findMany({
+        where,
+        columns: {
+          id: true,
+          clerkId: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          imageUrl: true,
+          phone: true,
+          isBanned: true,
+          role: true,
+          createdAt: true,
+          updatedAt: true,
         },
+        orderBy,
+        limit: query.limit,
+        offset,
+      }),
+
+      db.$count(users, conditions.length > 0 ? and(...conditions) : undefined),
+    ]);
+
+    const totalPages = Math.ceil(total / query.limit);
+
+    return Response.json({
+      success: true,
+      data,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages,
+        hasNextPage: query.page < totalPages,
+        hasPreviousPage: query.page > 1,
       },
     });
   } catch (error) {
-    return handleApiError(error);
+    if (error instanceof ApiError) {
+      return Response.json(
+        { success: false, message: error.message },
+        { status: error.statusCode },
+      );
+    }
+
+    console.error("GET /api/admin/users:", error);
+
+    return Response.json(
+      { success: false, message: "Failed to fetch users" },
+      { status: 500 },
+    );
   }
 }

@@ -1,146 +1,85 @@
-import { NextRequest, NextResponse } from "next/server";
-
-import { and, eq } from "drizzle-orm";
-
+import { NextRequest } from "next/server";
+import { eq } from "drizzle-orm";
 import { db } from "@/db/drizzle";
-
 import { users } from "@/db/schema/users";
-import { orders } from "@/db/schema/orders";
-
-import { requireAdmin } from "@/lib/APIs/auth";
-
+import { requireAdmin, requireSuperAdmin } from "@/lib/APIs/auth";
 import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
-
 import { updateAdminUserSchema, userIdParamSchema } from "@/lib/validations";
+
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
 // ============================================================
 // GET SINGLE USER
 // ============================================================
 
-export async function GET(
-  request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  },
-) {
+export async function GET(_request: NextRequest, context: RouteContext) {
   try {
-    // ========================================================
-    // 1. REQUIRE ADMIN
-    // ========================================================
-
     await requireAdmin();
 
-    // ========================================================
-    // 2. GET AND VALIDATE USER ID
-    // ========================================================
+    const { id } = userIdParamSchema.parse(await context.params);
 
-    const params = await context.params;
+    const user = await db.query.users.findFirst({
+      where: { id },
 
-    const { id } = userIdParamSchema.parse(params);
+      columns: {
+        id: true,
+        clerkId: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        imageUrl: true,
+        phone: true,
+        isBanned: true,
+        role: true,
+        createdAt: true,
+        updatedAt: true,
+      },
 
-    // ========================================================
-    // 3. FIND USER
-    // ========================================================
+      with: {
+        addresses: true,
 
-    const result = await db
-      .select({
-        id: users.id,
+        orders: {
+          columns: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            paymentStatus: true,
+            createdAt: true,
+          },
+        },
 
-        clerkId: users.clerkId,
+        cart: {
+          with: {
+            items: {
+              columns: { id: true, quantity: true },
+              with: {
+                product: { columns: { id: true, name: true } },
+                variant: { columns: { id: true } },
+              },
+            },
+          },
+        },
 
-        email: users.email,
+        ratings: {
+          with: { product: { columns: { id: true, name: true } } },
+        },
 
-        firstName: users.firstName,
+        wishlistItems: {
+          with: { product: { columns: { id: true, name: true } } },
+        },
 
-        lastName: users.lastName,
-
-        imageUrl: users.imageUrl,
-
-        phone: users.phone,
-
-        role: users.role,
-
-        isBanned: users.isBanned,
-
-        createdAt: users.createdAt,
-
-        updatedAt: users.updatedAt,
-      })
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-
-    const user = result[0];
-
-    // ========================================================
-    // 4. MAKE SURE USER EXISTS
-    // ========================================================
+        contactMessages: true,
+        inventoryMovements: true,
+      },
+    });
 
     if (!user) {
       throw new ApiError("User not found", 404);
     }
 
-    // ========================================================
-    // 5. GET USER ORDERS
-    // ========================================================
-
-    const userOrders = await db
-      .select({
-        id: orders.id,
-
-        orderNumber: orders.orderNumber,
-
-        status: orders.status,
-
-        paymentStatus: orders.paymentStatus,
-
-        paymentMethod: orders.paymentMethod,
-
-        subtotal: orders.subtotal,
-
-        shippingFee: orders.shippingFee,
-
-        discount: orders.discount,
-
-        total: orders.total,
-
-        createdAt: orders.createdAt,
-      })
-      .from(orders)
-      .where(eq(orders.userId, user.id))
-      .orderBy(orders.createdAt);
-
-    // ========================================================
-    // 6. CALCULATE ORDER SUMMARY
-    // ========================================================
-
-    const totalOrders = userOrders.length;
-
-    const totalSpent = userOrders.reduce((total, order) => {
-      return total + Number(order.total);
-    }, 0);
-
-    // ========================================================
-    // 7. RETURN USER
-    // ========================================================
-
-    return NextResponse.json({
-      success: true,
-
-      data: {
-        user,
-
-        summary: {
-          totalOrders,
-
-          totalSpent: totalSpent.toFixed(2),
-        },
-
-        orders: userOrders,
-      },
-    });
+    return Response.json({ success: true, data: user });
   } catch (error) {
     return handleApiError(error);
   }
@@ -150,149 +89,79 @@ export async function GET(
 // UPDATE USER
 // ============================================================
 
-export async function PATCH(
-  request: NextRequest,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  },
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
-    // ========================================================
-    // 1. REQUIRE ADMIN
-    // ========================================================
-
     const admin = await requireAdmin();
 
-    // ========================================================
-    // 2. GET AND VALIDATE USER ID
-    // ========================================================
+    const { id } = userIdParamSchema.parse(await context.params);
+    const data = updateAdminUserSchema.parse(await request.json());
 
-    const params = await context.params;
+    const existingUser = await db.query.users.findFirst({
+      where: { id },
+    });
 
-    const { id } = userIdParamSchema.parse(params);
-
-    // ========================================================
-    // 3. FIND USER
-    // ========================================================
-
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-
-    const user = result[0];
-
-    // ========================================================
-    // 4. MAKE SURE USER EXISTS
-    // ========================================================
-
-    if (!user) {
+    if (!existingUser) {
       throw new ApiError("User not found", 404);
     }
 
-    // ========================================================
-    // 5. READ REQUEST BODY
-    // ========================================================
-
-    const body = await request.json();
-
-    // ========================================================
-    // 6. VALIDATE REQUEST BODY
-    // ========================================================
-
-    const data = updateAdminUserSchema.parse(body);
-
-    // ========================================================
-    // 7. MAKE SURE SOMETHING WAS PROVIDED
-    // ========================================================
-
-    if (Object.keys(data).length === 0) {
-      throw new ApiError("At least one field is required", 400);
-    }
-
-    // ========================================================
-    // 8. PROTECT SUPER ADMIN
-    // ========================================================
-    //
-    // A normal admin should not be able to modify a
-    // super admin account.
-    //
-    // Only a super admin can modify another super admin.
-    //
-    // ========================================================
-
-    if (user.role === "super_admin" && admin.role !== "super_admin") {
+    if (existingUser.role === "super_admin" && admin.role !== "super_admin") {
       throw new ApiError("Only a super admin can modify a super admin", 403);
     }
 
-    // ========================================================
-    // 9. PREVENT ADMIN FROM CREATING SUPER ADMIN
-    // ========================================================
+    if (data.role !== undefined) {
+      if (admin.role !== "super_admin") {
+        throw new ApiError("Only a super admin can change user roles", 403);
+      }
 
-    if (data.role === "super_admin" && admin.role !== "super_admin") {
-      throw new ApiError(
-        "Only a super admin can assign the super admin role",
-        403,
-      );
+      if (existingUser.id === admin.id && data.role !== admin.role) {
+        throw new ApiError("You cannot change your own role", 403);
+      }
     }
 
-    // ========================================================
-    // 10. PREVENT SELF BAN
-    // ========================================================
-
-    if (id === admin.id && data.isBanned === true) {
-      throw new ApiError("You cannot ban your own account", 400);
-    }
-
-    // ========================================================
-    // 11. PREVENT SELF ROLE CHANGE
-    // ========================================================
-
-    if (
-      id === admin.id &&
-      data.role !== undefined &&
-      data.role !== admin.role
-    ) {
-      throw new ApiError("You cannot change your own role", 400);
-    }
-
-    // ========================================================
-    // 12. UPDATE USER
-    // ========================================================
-
-    const updatedResult = await db
+    const [updatedUser] = await db
       .update(users)
-      .set({
-        ...data,
-
-        updatedAt: new Date(),
-      })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
 
-    const updatedUser = updatedResult[0];
+    return Response.json({
+      success: true,
+      message: "User updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 
-    // ========================================================
-    // 13. MAKE SURE UPDATE SUCCEEDED
-    // ========================================================
+// ============================================================
+// DELETE USER
+// ============================================================
 
-    if (!updatedUser) {
-      throw new ApiError("Failed to update user", 500);
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  try {
+    const admin = await requireSuperAdmin();
+
+    const { id } = userIdParamSchema.parse(await context.params);
+
+    const existingUser = await db.query.users.findFirst({
+      where: { id },
+      columns: { id: true },
+    });
+
+    if (!existingUser) {
+      throw new ApiError("User not found", 404);
     }
 
-    // ========================================================
-    // 14. RETURN UPDATED USER
-    // ========================================================
+    if (existingUser.id === admin.id) {
+      throw new ApiError("You cannot delete your own account", 403);
+    }
 
-    return NextResponse.json({
+    await db.delete(users).where(eq(users.id, id));
+
+    return Response.json({
       success: true,
-
-      message: "User updated successfully",
-
-      data: updatedUser,
+      message: "User deleted successfully",
     });
   } catch (error) {
     return handleApiError(error);

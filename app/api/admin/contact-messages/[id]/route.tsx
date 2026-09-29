@@ -1,31 +1,22 @@
 import { NextRequest } from "next/server";
-
 import { eq } from "drizzle-orm";
 
-import {
-  contactMessages,
-} from "@/db/schema";
-
 import { db } from "@/db/drizzle";
+import { contactMessages } from "@/db/schema";
 
 import {
   ApiError,
   handleApiError,
 } from "@/lib/APIs/api-errors";
 
-import {
-  requireAdmin,
-} from "@/lib/APIs/auth";
+import { requireAdmin } from "@/lib/APIs/auth";
 
 import {
+  contactMessageIdParamSchema,
   updateContactMessageSchema,
 } from "@/lib/validations";
 
 export const runtime = "nodejs";
-
-// ============================================================
-// TYPES
-// ============================================================
 
 interface RouteContext {
   params: Promise<{
@@ -34,65 +25,67 @@ interface RouteContext {
 }
 
 // ============================================================
-// GET /api/admin/contact-messages/[id]
+// GET SINGLE CONTACT MESSAGE
 // ============================================================
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   context: RouteContext,
 ) {
   try {
     await requireAdmin();
 
-    // ========================================================
-    // PARAMS
-    // ========================================================
+    const { id } = await context.params;
 
-    const { id } =
-      await context.params;
+    // ----------------------------------------------------------
+    // Validate ID
+    // ----------------------------------------------------------
 
-    if (!id) {
-      throw new ApiError(
-        "Contact message ID is required",
-        400,
-      );
-    }
+    const { id: messageId } =
+      contactMessageIdParamSchema.parse({
+        id,
+      });
 
-    // ========================================================
-    // FIND MESSAGE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Relations v2 query
+    // ----------------------------------------------------------
 
     const message =
       await db.query.contactMessages.findFirst({
         where: {
-          id,
+          id: messageId,
+        },
+
+        columns: {
+          id: true,
+          userId: true,
+          name: true,
+          email: true,
+          phone: true,
+          subject: true,
+          message: true,
+          isRead: true,
+          createdAt: true,
         },
 
         with: {
           user: {
             columns: {
               id: true,
-
               clerkId: true,
-
               email: true,
-
               firstName: true,
-
               lastName: true,
-
               imageUrl: true,
-
               phone: true,
-
             },
           },
         },
       });
 
-    // ========================================================
-    // NOT FOUND
-    // ========================================================
+    // ----------------------------------------------------------
+    // Not found
+    // ----------------------------------------------------------
 
     if (!message) {
       throw new ApiError(
@@ -101,13 +94,12 @@ export async function GET(
       );
     }
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Response
+    // ----------------------------------------------------------
 
     return Response.json({
       success: true,
-
       data: message,
     });
   } catch (error) {
@@ -121,15 +113,7 @@ export async function GET(
 }
 
 // ============================================================
-// PATCH /api/admin/contact-messages/[id]
-// ============================================================
-//
-// Body:
-//
-// {
-//   "isRead": true
-// }
-//
+// UPDATE CONTACT MESSAGE
 // ============================================================
 
 export async function PATCH(
@@ -139,28 +123,40 @@ export async function PATCH(
   try {
     await requireAdmin();
 
-    // ========================================================
-    // PARAMS
-    // ========================================================
+    const { id } = await context.params;
 
-    const { id } =
-      await context.params;
+    // ----------------------------------------------------------
+    // Validate ID
+    // ----------------------------------------------------------
 
-    if (!id) {
-      throw new ApiError(
-        "Contact message ID is required",
-        400,
-      );
-    }
+    const { id: messageId } =
+      contactMessageIdParamSchema.parse({
+        id,
+      });
 
-    // ========================================================
-    // CHECK MESSAGE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Validate request body
+    // ----------------------------------------------------------
+
+    const body = await req.json();
+
+    const input =
+      updateContactMessageSchema.parse(body);
+
+    // ----------------------------------------------------------
+    // Check message exists
+    //
+    // This is a Relations v2 read.
+    // ----------------------------------------------------------
 
     const existingMessage =
       await db.query.contactMessages.findFirst({
         where: {
-          id,
+          id: messageId,
+        },
+
+        columns: {
+          id: true,
         },
       });
 
@@ -171,22 +167,13 @@ export async function PATCH(
       );
     }
 
-    // ========================================================
-    // REQUEST BODY
-    // ========================================================
-
-    const body = await req.json();
-
-    // ========================================================
-    // VALIDATE
-    // ========================================================
-
-    const input =
-      updateContactMessageSchema.parse(body);
-
-    // ========================================================
-    // UPDATE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Update
+    //
+    // IMPORTANT:
+    // update() is the SQL query builder.
+    // eq() is the correct syntax here.
+    // ----------------------------------------------------------
 
     const [updatedMessage] =
       await db
@@ -197,7 +184,7 @@ export async function PATCH(
         .where(
           eq(
             contactMessages.id,
-            id,
+            messageId,
           ),
         )
         .returning();
@@ -209,19 +196,16 @@ export async function PATCH(
       );
     }
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Return updated message
+    // ----------------------------------------------------------
 
     return Response.json({
       success: true,
-
       data: updatedMessage,
-
-      message:
-        input.isRead
-          ? "Message marked as read"
-          : "Message marked as unread",
+      message: input.isRead
+        ? "Message marked as read"
+        : "Message marked as unread",
     });
   } catch (error) {
     console.error(
@@ -234,38 +218,41 @@ export async function PATCH(
 }
 
 // ============================================================
-// DELETE /api/admin/contact-messages/[id]
+// DELETE CONTACT MESSAGE
 // ============================================================
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   context: RouteContext,
 ) {
   try {
     await requireAdmin();
 
-    // ========================================================
-    // PARAMS
-    // ========================================================
+    const { id } = await context.params;
 
-    const { id } =
-      await context.params;
+    // ----------------------------------------------------------
+    // Validate ID
+    // ----------------------------------------------------------
 
-    if (!id) {
-      throw new ApiError(
-        "Contact message ID is required",
-        400,
-      );
-    }
+    const { id: messageId } =
+      contactMessageIdParamSchema.parse({
+        id,
+      });
 
-    // ========================================================
-    // CHECK MESSAGE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Check message exists
+    //
+    // Relations v2 read.
+    // ----------------------------------------------------------
 
     const existingMessage =
       await db.query.contactMessages.findFirst({
         where: {
-          id,
+          id: messageId,
+        },
+
+        columns: {
+          id: true,
         },
       });
 
@@ -276,26 +263,40 @@ export async function DELETE(
       );
     }
 
-    // ========================================================
-    // DELETE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Delete
+    //
+    // IMPORTANT:
+    // delete() is the SQL query builder.
+    // eq() is the correct syntax here.
+    // ----------------------------------------------------------
 
-    await db
-      .delete(contactMessages)
-      .where(
-        eq(
-          contactMessages.id,
-          id,
-        ),
+    const [deletedMessage] =
+      await db
+        .delete(contactMessages)
+        .where(
+          eq(
+            contactMessages.id,
+            messageId,
+          ),
+        )
+        .returning({
+          id: contactMessages.id,
+        });
+
+    if (!deletedMessage) {
+      throw new ApiError(
+        "Failed to delete contact message",
+        500,
       );
+    }
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    // ----------------------------------------------------------
+    // Response
+    // ----------------------------------------------------------
 
     return Response.json({
       success: true,
-
       message:
         "Contact message deleted successfully",
     });

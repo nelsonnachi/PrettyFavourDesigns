@@ -1,12 +1,15 @@
+"use client";
+
 import {
   useMutation,
   useQuery,
-  useQueryClient,
 } from "@tanstack/react-query";
 
 import { apiClient } from "@/lib/api/client";
 
-import { contactMessageKeys } from "./contact-message-keys";
+import {
+  contactMessageKeys,
+} from "./contact-message-keys";
 
 import type {
   AdminContactMessageParams,
@@ -15,245 +18,131 @@ import type {
   ContactMessage,
   CreateContactMessageInput,
   CreateContactMessageResponse,
-  DeleteContactMessageResponse,
-  UpdateContactMessageInput,
-  UpdateContactMessageResponse,
 } from "./contact-message-types";
 
-// ============================================================
-// CREATE CONTACT MESSAGE
-// ============================================================
-//
-// POST /api/contact
-//
-// Public endpoint.
-//
-// Can be used by:
-// - logged-in users
-// - guests
-//
-// ============================================================
-
-async function createContactMessage(
-  input: CreateContactMessageInput
-): Promise<CreateContactMessageResponse["data"]> {
-  const response =
-    await apiClient<CreateContactMessageResponse>(
-      "/api/contact",
-      {
-        method: "POST",
-
-        body: JSON.stringify(input),
-      }
-    );
-
-  return response.data;
-}
-
-// ============================================================
-// GET ADMIN CONTACT MESSAGES
-// ============================================================
-//
-// GET /api/admin/contact-messages
-//
-// Admin only.
-//
-// Supports:
-//
-// page
-// limit
-// search
-// isRead
-// sort
-//
-// ============================================================
-
-async function getAdminContactMessages(
-  params: AdminContactMessageParams = {}
-): Promise<AdminContactMessagesResponse> {
-  const searchParams = new URLSearchParams();
-
-  // ----------------------------------------------------------
-  // Page
-  // ----------------------------------------------------------
-
-  if (params.page !== undefined) {
-    searchParams.set(
-      "page",
-      String(params.page)
-    );
-  }
-
-  // ----------------------------------------------------------
-  // Limit
-  // ----------------------------------------------------------
-
-  if (params.limit !== undefined) {
-    searchParams.set(
-      "limit",
-      String(params.limit)
-    );
-  }
-
-  // ----------------------------------------------------------
-  // Search
-  // ----------------------------------------------------------
-
-  if (params.search) {
-    searchParams.set(
-      "search",
-      params.search
-    );
-  }
-
-  // ----------------------------------------------------------
-  // Read status
-  // ----------------------------------------------------------
-
-  if (params.isRead !== undefined) {
-    searchParams.set(
-      "isRead",
-      String(params.isRead)
-    );
-  }
-
-  // ----------------------------------------------------------
-  // Sort
-  // ----------------------------------------------------------
-
-  if (params.sort) {
-    searchParams.set(
-      "sort",
-      params.sort
-    );
-  }
-
-  const queryString =
-    searchParams.toString();
-
-  const url = queryString
-    ? `/api/admin/contact-messages?${queryString}`
-    : "/api/admin/contact-messages";
-
-  return apiClient<AdminContactMessagesResponse>(
-    url
-  );
-}
-
-// ============================================================
-// GET ADMIN CONTACT MESSAGE
-// ============================================================
-//
-// GET /api/admin/contact-messages/[id]
-//
-// Admin only.
-//
-// ============================================================
-
-async function getAdminContactMessage(
-  id: string
-): Promise<ContactMessage> {
-  const response =
-    await apiClient<AdminContactMessageResponse>(
-      `/api/admin/contact-messages/${id}`
-    );
-
-  return response.data;
-}
-
-// ============================================================
-// UPDATE ADMIN CONTACT MESSAGE
-// ============================================================
-//
-// PATCH /api/admin/contact-messages/[id]
-//
-// Body:
-//
-// {
-//   "isRead": true
-// }
-//
-// ============================================================
-
-async function updateAdminContactMessage({
-  id,
-  data,
-}: {
-  id: string;
-
-  data: UpdateContactMessageInput;
-}): Promise<ContactMessage> {
-  const response =
-    await apiClient<UpdateContactMessageResponse>(
-      `/api/admin/contact-messages/${id}`,
-      {
-        method: "PATCH",
-
-        body: JSON.stringify(data),
-      }
-    );
-
-  return response.data;
-}
-
-// ============================================================
-// DELETE ADMIN CONTACT MESSAGE
-// ============================================================
-//
-// DELETE /api/admin/contact-messages/[id]
-//
-// ============================================================
-
-async function deleteAdminContactMessage(
-  id: string
-): Promise<void> {
-  await apiClient<DeleteContactMessageResponse>(
-    `/api/admin/contact-messages/${id}`,
+export async function createContactMessage(
+  input: CreateContactMessageInput,
+): Promise<CreateContactMessageResponse> {
+  return apiClient<CreateContactMessageResponse>(
+    "/api/contact-messages",
     {
-      method: "DELETE",
-    }
+      method: "POST",
+      body: JSON.stringify(input),
+    },
   );
 }
-
-// ============================================================
-// CREATE CONTACT MESSAGE
-// ============================================================
 
 export function useCreateContactMessage() {
-  return useMutation({
+  return useMutation<
+    CreateContactMessageResponse,
+    Error,
+    CreateContactMessageInput
+  >({
     mutationFn: createContactMessage,
   });
 }
 
-// ============================================================
-// GET ADMIN CONTACT MESSAGES
-// ============================================================
+export async function getAdminContactMessages(
+  params: AdminContactMessageParams = {},
+): Promise<AdminContactMessagesResponse> {
+  const searchParams =
+    new URLSearchParams();
+
+  searchParams.set(
+    "page",
+    String(params.page ?? 1),
+  );
+
+  searchParams.set(
+    "limit",
+    String(params.limit ?? 12),
+  );
+
+  if (params.search?.trim()) {
+    searchParams.set(
+      "search",
+      params.search.trim(),
+    );
+  }
+
+  if (params.isRead !== undefined) {
+    searchParams.set(
+      "isRead",
+      String(params.isRead),
+    );
+  }
+
+  searchParams.set(
+    "sort",
+    params.sort ?? "newest",
+  );
+
+  return apiClient<AdminContactMessagesResponse>(
+    `/api/admin/contact-messages?${searchParams.toString()}`,
+  );
+}
+
+export async function getAdminContactMessage(
+  id: string,
+): Promise<ContactMessage> {
+  const response =
+    await apiClient<AdminContactMessageResponse>(
+      `/api/admin/contact-messages/${id}`,
+    );
+
+  return response.data;
+}
+
+export async function getAdminUnreadContactMessageCount(): Promise<number> {
+  const response = await apiClient<{
+    success: boolean;
+    count: number;
+  }>(
+    "/api/admin/contact-messages/unread-count",
+  );
+
+  return response.count;
+}
 
 export function useAdminContactMessages(
-  params: AdminContactMessageParams = {}
+  params: AdminContactMessageParams = {},
 ) {
+  const page = params.page ?? 1;
+  const limit = params.limit ?? 12;
+
+  const search =
+    params.search?.trim() || undefined;
+
+  const isRead = params.isRead;
+
+  const sort =
+    params.sort ?? "newest";
+
   return useQuery({
-    queryKey: contactMessageKeys.adminList(
-      params.page ?? 1,
-      params.limit ?? 10,
-      params.search,
-      params.isRead,
-      params.sort ?? "newest"
-    ),
+    queryKey:
+      contactMessageKeys.adminList(
+        page,
+        limit,
+        search,
+        isRead,
+        sort,
+      ),
 
     queryFn: () =>
-      getAdminContactMessages(params),
+      getAdminContactMessages({
+        page,
+        limit,
+        search,
+        isRead,
+        sort,
+      }),
 
     staleTime: 60 * 1000,
   });
 }
 
-// ============================================================
-// GET ADMIN CONTACT MESSAGE
-// ============================================================
-
 export function useAdminContactMessage(
-  id: string
+  id: string,
 ) {
   return useQuery({
     queryKey:
@@ -268,82 +157,18 @@ export function useAdminContactMessage(
   });
 }
 
-// ============================================================
-// UPDATE ADMIN CONTACT MESSAGE
-// ============================================================
+export function useAdminUnreadContactMessageCount() {
+  return useQuery({
+    queryKey:
+      contactMessageKeys.unreadCount(),
 
-export function useUpdateAdminContactMessage() {
-  const queryClient =
-    useQueryClient();
+    queryFn:
+      getAdminUnreadContactMessageCount,
 
-  return useMutation({
-    mutationFn:
-      updateAdminContactMessage,
+    staleTime: 30 * 1000,
 
-    onSuccess: (
-      updatedMessage
-    ) => {
-      // ------------------------------------------------------
-      // Update the individual message cache.
-      // ------------------------------------------------------
+    refetchInterval: 30 * 1000,
 
-      queryClient.setQueryData(
-        contactMessageKeys.adminDetail(
-          updatedMessage.id
-        ),
-        updatedMessage
-      );
-
-      // ------------------------------------------------------
-      // Refresh admin lists.
-      //
-      // This is important because changing isRead can move
-      // a message between filtered "read" and "unread" lists.
-      // ------------------------------------------------------
-
-      queryClient.invalidateQueries({
-        queryKey:
-          contactMessageKeys.admin(),
-      });
-    },
-  });
-}
-
-// ============================================================
-// DELETE ADMIN CONTACT MESSAGE
-// ============================================================
-
-export function useDeleteAdminContactMessage() {
-  const queryClient =
-    useQueryClient();
-
-  return useMutation({
-    mutationFn:
-      deleteAdminContactMessage,
-
-    onSuccess: (
-      _data,
-      deletedId
-    ) => {
-      // ------------------------------------------------------
-      // Remove the detail cache.
-      // ------------------------------------------------------
-
-      queryClient.removeQueries({
-        queryKey:
-          contactMessageKeys.adminDetail(
-            deletedId
-          ),
-      });
-
-      // ------------------------------------------------------
-      // Refresh all admin contact-message lists.
-      // ------------------------------------------------------
-
-      queryClient.invalidateQueries({
-        queryKey:
-          contactMessageKeys.admin(),
-      });
-    },
+    refetchOnWindowFocus: true,
   });
 }

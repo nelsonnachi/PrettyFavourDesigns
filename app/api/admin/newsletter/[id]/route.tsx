@@ -36,15 +36,11 @@ interface RouteContext {
 // ============================================================
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   context: RouteContext,
 ) {
   try {
     await requireAdmin();
-
-    // ========================================================
-    // PARAMS
-    // ========================================================
 
     const { id } =
       await context.params;
@@ -57,25 +53,25 @@ export async function GET(
     }
 
     // ========================================================
-    // FIND SUBSCRIBER
+    // RELATIONS V2 READ
     // ========================================================
 
-    const result =
-      await db
-        .select()
-        .from(
-          newsletterSubscribers,
-        )
-        .where(
-          eq(
-            newsletterSubscribers.id,
-            id,
-          ),
-        )
-        .limit(1);
-
     const subscriber =
-      result[0];
+      await db.query.newsletterSubscribers.findFirst(
+        {
+          where: {
+            id,
+          },
+
+          columns: {
+            id: true,
+            email: true,
+            isSubscribed: true,
+            subscribedAt: true,
+            unsubscribedAt: true,
+          },
+        },
+      );
 
     if (!subscriber) {
       throw new ApiError(
@@ -84,13 +80,8 @@ export async function GET(
       );
     }
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
-
     return Response.json({
       success: true,
-
       data: subscriber,
     });
   } catch (error) {
@@ -106,20 +97,6 @@ export async function GET(
 // ============================================================
 // PATCH /api/admin/newsletter/[id]
 // ============================================================
-//
-// Body:
-//
-// {
-//   "isSubscribed": true
-// }
-//
-// or
-//
-// {
-//   "isSubscribed": false
-// }
-//
-// ============================================================
 
 export async function PATCH(
   req: NextRequest,
@@ -127,10 +104,6 @@ export async function PATCH(
 ) {
   try {
     await requireAdmin();
-
-    // ========================================================
-    // PARAMS
-    // ========================================================
 
     const { id } =
       await context.params;
@@ -143,43 +116,11 @@ export async function PATCH(
     }
 
     // ========================================================
-    // FIND SUBSCRIBER
-    // ========================================================
-
-    const result =
-      await db
-        .select()
-        .from(
-          newsletterSubscribers,
-        )
-        .where(
-          eq(
-            newsletterSubscribers.id,
-            id,
-          ),
-        )
-        .limit(1);
-
-    const subscriber =
-      result[0];
-
-    if (!subscriber) {
-      throw new ApiError(
-        "Newsletter subscriber not found",
-        404,
-      );
-    }
-
-    // ========================================================
-    // REQUEST BODY
+    // VALIDATE BODY
     // ========================================================
 
     const body =
       await req.json();
-
-    // ========================================================
-    // VALIDATE
-    // ========================================================
 
     if (
       typeof body.isSubscribed !==
@@ -195,7 +136,37 @@ export async function PATCH(
       body.isSubscribed;
 
     // ========================================================
+    // CHECK EXISTENCE
+    //
+    // Relations v2 read.
+    // ========================================================
+
+    const existingSubscriber =
+      await db.query.newsletterSubscribers.findFirst(
+        {
+          where: {
+            id,
+          },
+
+          columns: {
+            id: true,
+          },
+        },
+      );
+
+    if (!existingSubscriber) {
+      throw new ApiError(
+        "Newsletter subscriber not found",
+        404,
+      );
+    }
+
+    // ========================================================
     // UPDATE
+    //
+    // SQL UPDATE API.
+    //
+    // eq() is correct here.
     // ========================================================
 
     const [updated] =
@@ -217,7 +188,22 @@ export async function PATCH(
             id,
           ),
         )
-        .returning();
+        .returning({
+          id:
+            newsletterSubscribers.id,
+
+          email:
+            newsletterSubscribers.email,
+
+          isSubscribed:
+            newsletterSubscribers.isSubscribed,
+
+          subscribedAt:
+            newsletterSubscribers.subscribedAt,
+
+          unsubscribedAt:
+            newsletterSubscribers.unsubscribedAt,
+        });
 
     if (!updated) {
       throw new ApiError(
@@ -225,10 +211,6 @@ export async function PATCH(
         500,
       );
     }
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
 
     return Response.json({
       success: true,
@@ -254,15 +236,11 @@ export async function PATCH(
 // ============================================================
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   context: RouteContext,
 ) {
   try {
     await requireAdmin();
-
-    // ========================================================
-    // PARAMS
-    // ========================================================
 
     const { id } =
       await context.params;
@@ -275,30 +253,25 @@ export async function DELETE(
     }
 
     // ========================================================
-    // FIND SUBSCRIBER
+    // CHECK EXISTENCE
+    //
+    // Relations v2 read.
     // ========================================================
 
-    const result =
-      await db
-        .select({
-          id:
-            newsletterSubscribers.id,
-        })
-        .from(
-          newsletterSubscribers,
-        )
-        .where(
-          eq(
-            newsletterSubscribers.id,
+    const existingSubscriber =
+      await db.query.newsletterSubscribers.findFirst(
+        {
+          where: {
             id,
-          ),
-        )
-        .limit(1);
+          },
 
-    const subscriber =
-      result[0];
+          columns: {
+            id: true,
+          },
+        },
+      );
 
-    if (!subscriber) {
+    if (!existingSubscriber) {
       throw new ApiError(
         "Newsletter subscriber not found",
         404,
@@ -307,22 +280,34 @@ export async function DELETE(
 
     // ========================================================
     // DELETE
+    //
+    // SQL DELETE API.
+    //
+    // eq() is correct here.
     // ========================================================
 
-    await db
-      .delete(
-        newsletterSubscribers,
-      )
-      .where(
-        eq(
-          newsletterSubscribers.id,
-          id,
-        ),
+    const [deletedSubscriber] =
+      await db
+        .delete(
+          newsletterSubscribers,
+        )
+        .where(
+          eq(
+            newsletterSubscribers.id,
+            id,
+          ),
+        )
+        .returning({
+          id:
+            newsletterSubscribers.id,
+        });
+
+    if (!deletedSubscriber) {
+      throw new ApiError(
+        "Newsletter subscriber deletion failed",
+        500,
       );
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    }
 
     return Response.json({
       success: true,

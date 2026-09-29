@@ -17,10 +17,12 @@ export const userRoleSchema = z.enum([
 export const createUserSchema = z.object({
   clerkId: z
     .string()
+    .trim()
     .min(1, "Clerk ID is required"),
 
   email: z
     .string()
+    .trim()
     .email("Please provide a valid email address"),
 
   firstName: z
@@ -96,6 +98,7 @@ export const updateMyProfileSchema = z.object({
 
 export const updateAdminUserSchema = z.object({
   isBanned: z.boolean().optional(),
+
   role: userRoleSchema.optional(),
 });
 

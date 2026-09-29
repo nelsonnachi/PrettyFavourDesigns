@@ -1,7 +1,4 @@
-import {
-  keepPreviousData,
-  useQuery,
-} from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import {
   getAdminNewsletterSubscriber,
@@ -10,13 +7,13 @@ import {
 
 import { newsletterKeys } from "./newsletter-keys";
 
-import type {
-  NewsletterFilters,
-} from "./newsletter-types";
+import type { NewsletterFilters } from "./newsletter-types";
 
-// ============================================================
-// ADMIN NEWSLETTER LIST
-// ============================================================
+/**
+ * ============================================================
+ * ADMIN NEWSLETTER SUBSCRIBERS
+ * ============================================================
+ */
 
 export function useAdminNewsletterSubscribers(
   filters: NewsletterFilters = {},
@@ -24,26 +21,32 @@ export function useAdminNewsletterSubscribers(
   return useQuery({
     queryKey: newsletterKeys.adminList(filters),
 
-    queryFn: () =>
-      getAdminNewsletterSubscribers(filters),
+    queryFn: () => getAdminNewsletterSubscribers(filters),
 
     placeholderData: keepPreviousData,
+
+    staleTime: 60 * 1000,
   });
 }
 
-// ============================================================
-// ADMIN NEWSLETTER DETAIL
-// ============================================================
+/**
+ * ============================================================
+ * ADMIN NEWSLETTER SUBSCRIBER
+ * ============================================================
+ */
 
-export function useAdminNewsletterSubscriber(
-  id: string,
-) {
+export function useAdminNewsletterSubscriber(id: string) {
   return useQuery({
     queryKey: newsletterKeys.adminDetail(id),
 
-    queryFn: () =>
-      getAdminNewsletterSubscriber(id),
+    queryFn: async () => {
+      const response = await getAdminNewsletterSubscriber(id);
+
+      return response.data;
+    },
 
     enabled: Boolean(id),
+
+    staleTime: 60 * 1000,
   });
 }

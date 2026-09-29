@@ -162,7 +162,7 @@ export async function getAdminOrder(
 
 // ============================================================
 // UPDATE ADMIN ORDER STATUS
-// PATCH /api/admin/orders/[id]
+// PATCH /api/admin/orders/[id]/status
 // ============================================================
 
 export async function updateAdminOrderStatus(
@@ -178,7 +178,7 @@ export async function updateAdminOrderStatus(
         order: AdminOrderResponse["data"]["order"];
       };
     }>(
-      `/api/admin/orders/${orderId}`,
+      `/api/admin/orders/${orderId}/status`,
       {
         method: "PATCH",
 

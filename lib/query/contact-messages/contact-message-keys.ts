@@ -1,31 +1,18 @@
-// ============================================================
-// CONTACT MESSAGE QUERY KEYS
-// ============================================================
-
 export const contactMessageKeys = {
-  // ----------------------------------------------------------
-  // Root
-  // ----------------------------------------------------------
-
   all: ["contact-messages"] as const,
 
-  // ----------------------------------------------------------
-  // Admin list
-  // ----------------------------------------------------------
-
   admin: () =>
-    [...contactMessageKeys.all, "admin"] as const,
-
-  // ----------------------------------------------------------
-  // Admin list with filters
-  // ----------------------------------------------------------
+    [
+      ...contactMessageKeys.all,
+      "admin",
+    ] as const,
 
   adminList: (
     page: number,
     limit: number,
     search?: string,
     isRead?: boolean,
-    sort?: "newest" | "oldest"
+    sort: "newest" | "oldest" = "newest",
   ) =>
     [
       ...contactMessageKeys.admin(),
@@ -33,16 +20,22 @@ export const contactMessageKeys = {
       {
         page,
         limit,
-        search,
+        search: search || undefined,
         isRead,
         sort,
       },
     ] as const,
 
-  // ----------------------------------------------------------
-  // Admin single message
-  // ----------------------------------------------------------
-
   adminDetail: (id: string) =>
-    [...contactMessageKeys.admin(), "detail", id] as const,
+    [
+      ...contactMessageKeys.admin(),
+      "detail",
+      id,
+    ] as const,
+
+  unreadCount: () =>
+    [
+      ...contactMessageKeys.admin(),
+      "unread-count",
+    ] as const,
 };

@@ -9,46 +9,18 @@ export type AnnouncementType =
   | "class";
 
 // ============================================================
-// CAMPAIGN STATUS
-// ============================================================
-
-export type CampaignStatus =
-  | "draft"
-  | "upcoming"
-  | "active"
-  | "expired";
-
-// ============================================================
 // ANNOUNCEMENT
 // ============================================================
 
 export type Announcement = {
   id: string;
-
   type: AnnouncementType;
-
-  title: string;
-
-  description: string | null;
-
-  imageUrl: string | null;
-
-  imagePublicId: string | null;
-
+  title: string | null;
+  imageUrl: string;
+  imagePublicId: string;
   ctaText: string | null;
-
   ctaUrl: string | null;
-
-  eventAt: string | null;
-
-  expiresAt: string | null;
-
-  isPublished: boolean;
-
-  publishedAt: string | null;
-
   createdAt: string;
-
   updatedAt: string;
 };
 
@@ -56,34 +28,17 @@ export type Announcement = {
 // PUBLIC ANNOUNCEMENT
 // ============================================================
 //
-// Public API does not return:
-// - imagePublicId
-// - isPublished
-// - updatedAt
-//
+// imagePublicId and updatedAt are intentionally not exposed
+// to the storefront.
 // ============================================================
 
 export type PublicAnnouncement = {
   id: string;
-
   type: AnnouncementType;
-
-  title: string;
-
-  description: string | null;
-
-  imageUrl: string | null;
-
+  title: string | null;
+  imageUrl: string;
   ctaText: string | null;
-
   ctaUrl: string | null;
-
-  eventAt: string | null;
-
-  expiresAt: string | null;
-
-  publishedAt: string | null;
-
   createdAt: string;
 };
 
@@ -92,9 +47,7 @@ export type PublicAnnouncement = {
 // ============================================================
 
 export type AdminAnnouncement =
-  Announcement & {
-    campaignStatus: CampaignStatus;
-  };
+  Announcement;
 
 // ============================================================
 // PUBLIC FILTERS
@@ -109,53 +62,61 @@ export type PublicAnnouncementFilters = {
 // ============================================================
 
 export type AdminAnnouncementFilters = {
-  search?: string;
-
   type?: AnnouncementType;
-
-  isPublished?: boolean;
-
-  page?: number;
-
-  limit?: number;
-
   sort?: "newest" | "oldest";
 };
 
 // ============================================================
-// PAGINATION
+// CREATE INPUT
 // ============================================================
 
-export type AnnouncementPagination = {
-  page: number;
-
-  limit: number;
-
-  total: number;
-
-  totalPages: number;
+export type CreateAnnouncementInput = {
+  image: File;
+  type?: AnnouncementType;
+  title?: string;
+  ctaText?: string;
+  ctaUrl?: string;
 };
 
 // ============================================================
-// PUBLIC LIST RESPONSE
+// UPDATE INPUT
 // ============================================================
 
-export type PublicAnnouncementListResponse = {
+export type UpdateAnnouncementInput = {
+  id: string;
+  image?: File;
+  type?: AnnouncementType;
+  title?: string | null;
+  ctaText?: string | null;
+  ctaUrl?: string | null;
+};
+
+// ============================================================
+// PUBLIC RESPONSE
+// ============================================================
+
+export type PublicAnnouncementResponse = {
   success: true;
 
-  data: PublicAnnouncement[];
+  data: {
+    announcement:
+      | PublicAnnouncement
+      | null;
+  };
 };
 
 // ============================================================
-// ADMIN LIST RESPONSE
+// ADMIN CURRENT RESPONSE
 // ============================================================
 
 export type AdminAnnouncementListResponse = {
   success: true;
 
-  data: AdminAnnouncement[];
-
-  pagination: AnnouncementPagination;
+  data: {
+    announcement:
+      | AdminAnnouncement
+      | null;
+  };
 };
 
 // ============================================================
@@ -165,7 +126,9 @@ export type AdminAnnouncementListResponse = {
 export type AdminAnnouncementResponse = {
   success: true;
 
-  data: AdminAnnouncement;
+  data: {
+    announcement: AdminAnnouncement;
+  };
 };
 
 // ============================================================
@@ -175,7 +138,9 @@ export type AdminAnnouncementResponse = {
 export type AdminCreateAnnouncementResponse = {
   success: true;
 
-  data: AdminAnnouncement;
+  data: {
+    announcement: AdminAnnouncement;
+  };
 
   message: string;
 };
@@ -187,7 +152,9 @@ export type AdminCreateAnnouncementResponse = {
 export type AdminUpdateAnnouncementResponse = {
   success: true;
 
-  data: AdminAnnouncement;
+  data: {
+    announcement: AdminAnnouncement;
+  };
 
   message: string;
 };
@@ -200,4 +167,8 @@ export type AdminDeleteAnnouncementResponse = {
   success: true;
 
   message: string;
+
+  data: {
+    id: string;
+  };
 };

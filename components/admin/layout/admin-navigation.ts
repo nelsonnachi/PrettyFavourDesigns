@@ -66,8 +66,8 @@ export const adminNavigation: AdminNavItem[] = [
     icon: Tags,
   },
   {
-    label: "Settings",
-    href: "/admin/settings",
+    label: "Announcement",
+    href: "/admin/announcements",
     icon: Settings,
   },
 ];

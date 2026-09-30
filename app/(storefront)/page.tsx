@@ -1,3 +1,4 @@
+import { AnnouncementSection } from "@/components/(storefront)/announcements/AnnouncementSection";
 import { BrandStory } from "@/components/(storefront)/homepage/BrandStory";
 import { OurCollection } from "@/components/(storefront)/homepage/Collection";
 import { HappyClients } from "@/components/(storefront)/homepage/HappyClients";
@@ -19,6 +20,9 @@ export default function HomePage() {
 
       {/* Our Story */}
       <BrandStory />
+
+      {/* Announcement */}
+      <AnnouncementSection  />
 
       {/* Happy Client */}
       <HappyClients />

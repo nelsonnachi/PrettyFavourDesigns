@@ -1,70 +1,31 @@
-import {
-  pgTable,
-  uuid,
-  text,
-  timestamp,
-  boolean,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
 
 import { announcementTypeEnum } from "./enums";
 
 export const announcements = pgTable(
   "announcements",
   {
-    id: uuid("id")
-      .primaryKey()
-      .defaultRandom(),
+    id: uuid("id").primaryKey().defaultRandom(),
 
-    type: announcementTypeEnum(
-      "type",
-    )
-      .notNull()
-      .default("general"),
+    // Type of announcement.
+    type: announcementTypeEnum("type").notNull().default("general"),
 
-    title: text("title")
-      .notNull(),
+    // Optional internal/display title.
+    // The actual announcement shown to customers
+    // is the uploaded image.
+    title: text("title"),
 
-    description: text(
-      "description",
-    ),
+    // Cloudinary secure URL.
+    imageUrl: text("image_url").notNull(),
 
-    imageUrl: text("image_url"),
+    // Cloudinary public ID.
+    // Required so the image can be deleted later.
+    imagePublicId: text("image_public_id").notNull(),
 
-    imagePublicId: text(
-      "image_public_id",
-    ),
-
+    // Optional call-to-action.
     ctaText: text("cta_text"),
 
     ctaUrl: text("cta_url"),
-
-    // The exact date/time the event begins.
-    eventAt: timestamp("event_at", {
-      withTimezone: true,
-    }),
-
-    // When this announcement should stop
-    // appearing.
-    expiresAt: timestamp(
-      "expires_at",
-      {
-        withTimezone: true,
-      },
-    ),
-
-    isPublished: boolean(
-      "is_published",
-    )
-      .notNull()
-      .default(false),
-
-    publishedAt: timestamp(
-      "published_at",
-      {
-        withTimezone: true,
-      },
-    ),
 
     createdAt: timestamp("created_at", {
       withTimezone: true,
@@ -80,17 +41,8 @@ export const announcements = pgTable(
   },
 
   (table) => ({
-    publishedIdx: index(
-      "announcements_published_idx",
-    ).on(table.isPublished),
+    typeIdx: index("announcements_type_idx").on(table.type),
 
-    eventIdx: index(
-      "announcements_event_idx",
-    ).on(table.eventAt),
-
-    expiresIdx: index(
-      "announcements_expires_idx",
-    ).on(table.expiresAt),
-  }),
+    createdAtIdx: index("announcements_created_at_idx").on(table.createdAt),
+  })
 );
-

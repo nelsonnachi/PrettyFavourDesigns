@@ -1,413 +1,295 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import { eq } from "drizzle-orm";
 
-
-
 import { db } from "@/db/drizzle";
-
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
-
+import { announcements } from "@/db/schema/announcements";
+import { announcementTypeEnum } from "@/db/schema/enums";
 import { requireAdmin } from "@/lib/APIs/auth";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
+import { uploadImageToCloudinary } from "@/lib/cloudinary/upload";
+import { deleteImageFromCloudinary } from "@/lib/cloudinary/delete";
 
-import {
-  updateAnnouncementSchema,
-} from "@/lib/validations";
-import { announcements } from "@/db/schema";
-
-export const runtime = "nodejs";
 
 // ============================================================
-// TYPES
+// PARAMS
 // ============================================================
 
-interface RouteContext {
+interface AnnouncementRouteContext {
   params: Promise<{
     id: string;
   }>;
 }
 
 // ============================================================
-// GET /api/admin/announcements/[id]
+// GET ONE ANNOUNCEMENT
 // ============================================================
 
 export async function GET(
-  req: NextRequest,
-  context: RouteContext,
+  _request: NextRequest,
+  context: AnnouncementRouteContext,
 ) {
   try {
     await requireAdmin();
 
     const { id } = await context.params;
 
-    if (!id) {
-      throw new ApiError(
-        "Announcement ID is required",
-        400,
-      );
-    }
-
-    const announcement =
-      await db.query.announcements.findFirst({
-        where: {
-          id,
-        },
-      });
+    const announcement = await db.query.announcements.findFirst({
+      where: { id },
+    });
 
     if (!announcement) {
-      throw new ApiError(
-        "Announcement not found",
-        404,
-      );
+      throw new ApiError("Announcement not found", 404);
     }
 
-    // ========================================================
-    // CAMPAIGN STATUS
-    // ========================================================
-
-    const now = new Date();
-
-    let campaignStatus:
-      | "draft"
-      | "upcoming"
-      | "active"
-      | "expired";
-
-    if (!announcement.isPublished) {
-      campaignStatus = "draft";
-    } else if (
-      announcement.eventAt &&
-      now < announcement.eventAt
-    ) {
-      campaignStatus = "upcoming";
-    } else if (
-      announcement.expiresAt &&
-      now >= announcement.expiresAt
-    ) {
-      campaignStatus = "expired";
-    } else {
-      campaignStatus = "active";
-    }
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-
       data: {
-        ...announcement,
-        campaignStatus,
+        announcement,
       },
     });
   } catch (error) {
-    console.error(
-      "GET /api/admin/announcements/[id] error:",
-      error,
-    );
-
     return handleApiError(error);
   }
 }
 
 // ============================================================
-// PATCH /api/admin/announcements/[id]
+// UPDATE ANNOUNCEMENT
 // ============================================================
 
 export async function PATCH(
-  req: NextRequest,
-  context: RouteContext,
+  request: NextRequest,
+  context: AnnouncementRouteContext,
 ) {
+  let uploadedPublicId: string | null = null;
+
   try {
     await requireAdmin();
 
     const { id } = await context.params;
 
-    if (!id) {
-      throw new ApiError(
-        "Announcement ID is required",
-        400,
-      );
+    // --------------------------------------------------------
+    // Find existing announcement
+    // --------------------------------------------------------
+
+    const existingAnnouncement = await db.query.announcements.findFirst({
+      where: { id },
+    });
+
+    if (!existingAnnouncement) {
+      throw new ApiError("Announcement not found", 404);
     }
 
-    // ========================================================
-    // FIND EXISTING
-    // ========================================================
+    // --------------------------------------------------------
+    // Read multipart form data
+    // --------------------------------------------------------
 
-    const existing =
-      await db.query.announcements.findFirst({
-        where: {
-          id,
-        },
-      });
+    const formData = await request.formData();
 
-    if (!existing) {
-      throw new ApiError(
-        "Announcement not found",
-        404,
-      );
-    }
+    const image = formData.get("image");
+    const typeValue = formData.get("type");
+    const titleValue = formData.get("title");
+    const ctaTextValue = formData.get("ctaText");
+    const ctaUrlValue = formData.get("ctaUrl");
 
-    // ========================================================
-    // BODY
-    // ========================================================
+    // --------------------------------------------------------
+    // Determine updated values
+    // --------------------------------------------------------
 
-    const body = await req.json();
-
-    // ========================================================
-    // VALIDATE
-    // ========================================================
-
-    const input =
-      updateAnnouncementSchema.parse(body);
-
-    // ========================================================
-    // EFFECTIVE DATES
-    // ========================================================
-
-    const eventAt =
-      input.eventAt !== undefined
-        ? input.eventAt
-        : existing.eventAt;
-
-    const expiresAt =
-      input.expiresAt !== undefined
-        ? input.expiresAt
-        : existing.expiresAt;
-
-    // ========================================================
-    // VALIDATE DATE ORDER
-    // ========================================================
+    const type =
+      typeof typeValue === "string" && typeValue.trim()
+        ? typeValue.trim()
+        : existingAnnouncement.type;
 
     if (
-      eventAt &&
-      expiresAt &&
-      expiresAt <= eventAt
+      !announcementTypeEnum.enumValues.includes(
+        type as (typeof announcementTypeEnum.enumValues)[number],
+      )
     ) {
-      throw new ApiError(
-        "Expiration date must be after the event start date",
-        422,
+      throw new ApiError("Invalid announcement type", 400);
+    }
+
+    const title =
+      titleValue === null
+        ? existingAnnouncement.title
+        : typeof titleValue === "string" && titleValue.trim()
+          ? titleValue.trim()
+          : null;
+
+    const ctaText =
+      ctaTextValue === null
+        ? existingAnnouncement.ctaText
+        : typeof ctaTextValue === "string" && ctaTextValue.trim()
+          ? ctaTextValue.trim()
+          : null;
+
+    const ctaUrl =
+      ctaUrlValue === null
+        ? existingAnnouncement.ctaUrl
+        : typeof ctaUrlValue === "string" && ctaUrlValue.trim()
+          ? ctaUrlValue.trim()
+          : null;
+
+    // --------------------------------------------------------
+    // Upload replacement image if provided
+    // --------------------------------------------------------
+
+    let imageUrl = existingAnnouncement.imageUrl;
+    let imagePublicId = existingAnnouncement.imagePublicId;
+
+    if (image instanceof File) {
+      if (image.size === 0) {
+        throw new ApiError("Announcement image cannot be empty", 400);
+      }
+
+      if (!image.type.startsWith("image/")) {
+        throw new ApiError("Announcement file must be an image", 400);
+      }
+
+      const uploadedImage = await uploadImageToCloudinary(
+        image,
+        "shoppfd/announcements",
       );
+
+      uploadedPublicId = uploadedImage.publicId;
+      imageUrl = uploadedImage.url;
+      imagePublicId = uploadedImage.publicId;
     }
 
-    // ========================================================
-    // BUILD UPDATE
-    // ========================================================
+    // --------------------------------------------------------
+    // Update database
+    // --------------------------------------------------------
 
-    const values: Partial<
-      typeof announcements.$inferInsert
-    > = {};
+    let updatedAnnouncement;
 
-    if (input.type !== undefined) {
-      values.type = input.type;
+    try {
+      const result = await db
+        .update(announcements)
+        .set({
+          type: type as (typeof announcementTypeEnum.enumValues)[number],
+          title,
+          imageUrl,
+          imagePublicId,
+          ctaText,
+          ctaUrl,
+          updatedAt: new Date(),
+        })
+        .where(eq(announcements.id, id))
+        .returning();
+
+      updatedAnnouncement = result[0];
+    } catch (databaseError) {
+      // If a new image was uploaded but the
+      // database update failed, clean it up.
+      if (uploadedPublicId) {
+        try {
+          await deleteImageFromCloudinary(uploadedPublicId);
+        } catch (cleanupError) {
+          console.error(
+            "Failed to clean up replacement announcement image:",
+            cleanupError,
+          );
+        }
+      }
+
+      throw databaseError;
     }
 
-    if (input.title !== undefined) {
-      values.title = input.title;
+    if (!updatedAnnouncement) {
+      throw new ApiError("Announcement could not be updated", 500);
     }
 
-    if (input.description !== undefined) {
-      values.description =
-        input.description;
-    }
-
-    if (input.imageUrl !== undefined) {
-      values.imageUrl =
-        input.imageUrl;
-    }
+    // --------------------------------------------------------
+    // Delete previous image if it was replaced
+    // --------------------------------------------------------
 
     if (
-      input.imagePublicId !== undefined
+      uploadedPublicId &&
+      existingAnnouncement.imagePublicId &&
+      existingAnnouncement.imagePublicId !== uploadedPublicId
     ) {
-      values.imagePublicId =
-        input.imagePublicId;
-    }
-
-    if (input.ctaText !== undefined) {
-      values.ctaText =
-        input.ctaText;
-    }
-
-    if (input.ctaUrl !== undefined) {
-      values.ctaUrl =
-        input.ctaUrl;
-    }
-
-    if (input.eventAt !== undefined) {
-      values.eventAt =
-        input.eventAt;
-    }
-
-    if (input.expiresAt !== undefined) {
-      values.expiresAt =
-        input.expiresAt;
-    }
-
-    // ========================================================
-    // PUBLISH / UNPUBLISH
-    // ========================================================
-
-    if (input.isPublished !== undefined) {
-      values.isPublished =
-        input.isPublished;
-
-      if (input.isPublished) {
-        values.publishedAt =
-          existing.publishedAt ??
-          new Date();
-      } else {
-        values.publishedAt = null;
+      try {
+        await deleteImageFromCloudinary(existingAnnouncement.imagePublicId);
+      } catch (cloudinaryError) {
+        console.error(
+          "Failed to delete previous announcement image:",
+          cloudinaryError,
+        );
       }
     }
 
-    // ========================================================
-    // UPDATED AT
-    // ========================================================
+    // --------------------------------------------------------
+    // Response
+    // --------------------------------------------------------
 
-    values.updatedAt = new Date();
-
-    // ========================================================
-    // UPDATE
-    // ========================================================
-
-    const [updated] = await db
-      .update(announcements)
-      .set(values)
-      .where(
-        eq(
-          announcements.id,
-          id,
-        ),
-      )
-      .returning();
-
-    if (!updated) {
-      throw new ApiError(
-        "Announcement update failed",
-        500,
-      );
-    }
-
-    // ========================================================
-    // CAMPAIGN STATUS
-    // ========================================================
-
-    const now = new Date();
-
-    let campaignStatus:
-      | "draft"
-      | "upcoming"
-      | "active"
-      | "expired";
-
-    if (!updated.isPublished) {
-      campaignStatus = "draft";
-    } else if (
-      updated.eventAt &&
-      now < updated.eventAt
-    ) {
-      campaignStatus = "upcoming";
-    } else if (
-      updated.expiresAt &&
-      now >= updated.expiresAt
-    ) {
-      campaignStatus = "expired";
-    } else {
-      campaignStatus = "active";
-    }
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-
+      message: "Announcement updated successfully",
       data: {
-        ...updated,
-        campaignStatus,
+        announcement: updatedAnnouncement,
       },
-
-      message:
-        "Announcement updated successfully",
     });
   } catch (error) {
-    console.error(
-      "PATCH /api/admin/announcements/[id] error:",
-      error,
-    );
-
     return handleApiError(error);
   }
 }
 
 // ============================================================
-// DELETE /api/admin/announcements/[id]
+// DELETE ANNOUNCEMENT
 // ============================================================
 
 export async function DELETE(
-  req: NextRequest,
-  context: RouteContext,
+  _request: NextRequest,
+  context: AnnouncementRouteContext,
 ) {
   try {
     await requireAdmin();
 
     const { id } = await context.params;
 
-    if (!id) {
-      throw new ApiError(
-        "Announcement ID is required",
-        400,
+    // --------------------------------------------------------
+    // Find announcement
+    // --------------------------------------------------------
+
+    const announcement = await db.query.announcements.findFirst({
+      where: { id },
+    });
+
+    if (!announcement) {
+      throw new ApiError("Announcement not found", 404);
+    }
+
+    // --------------------------------------------------------
+    // Delete database record
+    // --------------------------------------------------------
+
+    await db.delete(announcements).where(eq(announcements.id, id));
+
+    // --------------------------------------------------------
+    // Delete Cloudinary image
+    // --------------------------------------------------------
+
+    try {
+      await deleteImageFromCloudinary(announcement.imagePublicId);
+    } catch (cloudinaryError) {
+      console.error(
+        "Failed to delete announcement image from Cloudinary:",
+        cloudinaryError,
       );
     }
 
-    // ========================================================
-    // FIND EXISTING
-    // ========================================================
+    // --------------------------------------------------------
+    // Response
+    // --------------------------------------------------------
 
-    const existing =
-      await db.query.announcements.findFirst({
-        where: {
-          id,
-        },
-      });
-
-    if (!existing) {
-      throw new ApiError(
-        "Announcement not found",
-        404,
-      );
-    }
-
-    // ========================================================
-    // DELETE
-    // ========================================================
-
-    await db
-      .delete(announcements)
-      .where(
-        eq(
-          announcements.id,
-          id,
-        ),
-      );
-
-    // ========================================================
-    // RESPONSE
-    // ========================================================
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-
-      message:
-        "Announcement deleted successfully",
+      message: "Announcement deleted successfully",
+      data: {
+        id,
+      },
     });
   } catch (error) {
-    console.error(
-      "DELETE /api/admin/announcements/[id] error:",
-      error,
-    );
-
     return handleApiError(error);
   }
 }

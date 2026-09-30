@@ -1,380 +1,208 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  ilike,
-  or,
-  type SQL,
-} from "drizzle-orm";
-
-
+import { eq } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
-
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { announcements } from "@/db/schema/announcements";
+import { announcementTypeEnum } from "@/db/schema/enums";
 
 import { requireAdmin } from "@/lib/APIs/auth";
-
-import {
-  createAnnouncementSchema,
-} from "@/lib/validations";
-import { announcements } from "@/db/schema";
-
-export const runtime = "nodejs";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
+import { uploadImageToCloudinary } from "@/lib/cloudinary/upload";
+import { deleteImageFromCloudinary } from "@/lib/cloudinary/delete";
 
 // ============================================================
-// GET /api/admin/announcements
+// GET CURRENT ANNOUNCEMENT
 // ============================================================
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     await requireAdmin();
 
-    const searchParams = req.nextUrl.searchParams;
-
-    // ========================================================
-    // PAGINATION
-    // ========================================================
-
-    const page = Math.max(
-      Number(searchParams.get("page")) || 1,
-      1,
-    );
-
-    const limit = Math.min(
-      Math.max(
-        Number(searchParams.get("limit")) || 10,
-        1,
-      ),
-      100,
-    );
-
-    const offset = (page - 1) * limit;
-
-    // ========================================================
-    // FILTERS
-    // ========================================================
-
-    const search =
-      searchParams.get("search")?.trim() || undefined;
-
-    const type =
-      searchParams.get("type") || undefined;
-
-    const isPublishedParam =
-      searchParams.get("isPublished");
-
-    const isPublished =
-      isPublishedParam === null
-        ? undefined
-        : isPublishedParam === "true";
-
-    const sort =
-      searchParams.get("sort") || "newest";
-
-    // ========================================================
-    // CONDITIONS
-    // ========================================================
-
-    const conditions: SQL[] = [];
-
-    // ========================================================
-    // SEARCH
-    // ========================================================
-
-    if (search) {
-      const searchCondition = or(
-        ilike(
-          announcements.title,
-          `%${search}%`,
-        ),
-
-        ilike(
-          announcements.description,
-          `%${search}%`,
-        ),
-
-        ilike(
-          announcements.ctaText,
-          `%${search}%`,
-        ),
-      );
-
-      if (searchCondition) {
-        conditions.push(searchCondition);
-      }
-    }
-
-    // ========================================================
-    // TYPE
-    // ========================================================
-
-    if (
-      type === "general" ||
-      type === "sale" ||
-      type === "event" ||
-      type === "class"
-    ) {
-      conditions.push(
-        eq(
-          announcements.type,
-          type,
-        ),
-      );
-    }
-
-    // ========================================================
-    // PUBLISHED
-    // ========================================================
-
-    if (isPublished !== undefined) {
-      conditions.push(
-        eq(
-          announcements.isPublished,
-          isPublished,
-        ),
-      );
-    }
-
-    // ========================================================
-    // WHERE
-    // ========================================================
-
-    const whereCondition =
-      conditions.length > 0
-        ? and(...conditions)
-        : undefined;
-
-    // ========================================================
-    // SORT
-    // ========================================================
-
-    const orderBy =
-      sort === "oldest"
-        ? asc(announcements.createdAt)
-        : desc(announcements.createdAt);
-
-    // ========================================================
-    // GET ANNOUNCEMENTS
-    // ========================================================
-
-    const rows = await db
-      .select()
-      .from(announcements)
-      .where(whereCondition)
-      .orderBy(orderBy)
-      .limit(limit)
-      .offset(offset);
-
-    // ========================================================
-    // COUNT
-    // ========================================================
-
-    const total = await db.$count(
-      announcements,
-      whereCondition,
-    );
-
-    // ========================================================
-    // ADD CAMPAIGN STATUS
-    // ========================================================
-
-    const now = new Date();
-
-    const data = rows.map((announcement) => {
-      let campaignStatus:
-        | "draft"
-        | "upcoming"
-        | "active"
-        | "expired";
-
-      if (!announcement.isPublished) {
-        campaignStatus = "draft";
-      } else if (
-        announcement.eventAt &&
-        now < announcement.eventAt
-      ) {
-        campaignStatus = "upcoming";
-      } else if (
-        announcement.expiresAt &&
-        now >= announcement.expiresAt
-      ) {
-        campaignStatus = "expired";
-      } else {
-        campaignStatus = "active";
-      }
-
-      return {
-        ...announcement,
-        campaignStatus,
-      };
+    const announcement = await db.query.announcements.findFirst({
+      orderBy: { createdAt: "desc" },
     });
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
-
-    return Response.json({
+    return NextResponse.json({
       success: true,
-
-      data,
-
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(
-          total / limit,
-        ),
+      data: {
+        announcement: announcement ?? null,
       },
     });
   } catch (error) {
-    console.error(
-      "GET /api/admin/announcements error:",
-      error,
-    );
-
     return handleApiError(error);
   }
 }
 
 // ============================================================
-// POST /api/admin/announcements
+// CREATE / REPLACE ANNOUNCEMENT
 // ============================================================
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
+  let uploadedPublicId: string | null = null;
+
   try {
     await requireAdmin();
 
-    // ========================================================
-    // BODY
-    // ========================================================
+    const formData = await request.formData();
 
-    const body = await req.json();
+    const image = formData.get("image");
+    const typeValue = formData.get("type");
+    const titleValue = formData.get("title");
+    const ctaTextValue = formData.get("ctaText");
+    const ctaUrlValue = formData.get("ctaUrl");
 
-    // ========================================================
-    // VALIDATE
-    // ========================================================
+    // --------------------------------------------------------
+    // Validate image
+    // --------------------------------------------------------
 
-    const input =
-      createAnnouncementSchema.parse(body);
-
-    // ========================================================
-    // PUBLISHED DATE
-    // ========================================================
-
-    const isPublished =
-      input.isPublished ?? false;
-
-    const publishedAt = isPublished
-      ? new Date()
-      : null;
-
-    // ========================================================
-    // CREATE
-    // ========================================================
-
-    const [announcement] = await db
-      .insert(announcements)
-      .values({
-        type: input.type,
-
-        title: input.title,
-
-        description:
-          input.description,
-
-        imageUrl:
-          input.imageUrl,
-
-        imagePublicId:
-          input.imagePublicId,
-
-        ctaText:
-          input.ctaText,
-
-        ctaUrl:
-          input.ctaUrl,
-
-        eventAt:
-          input.eventAt,
-
-        expiresAt:
-          input.expiresAt,
-
-        isPublished,
-
-        publishedAt,
-      })
-      .returning();
-
-    if (!announcement) {
-      throw new ApiError(
-        "Announcement creation failed",
-        500,
-      );
+    if (!(image instanceof File)) {
+      throw new ApiError("Announcement image is required", 400);
     }
 
-    // ========================================================
-    // CAMPAIGN STATUS
-    // ========================================================
-
-    const now = new Date();
-
-    let campaignStatus:
-      | "draft"
-      | "upcoming"
-      | "active"
-      | "expired";
-
-    if (!announcement.isPublished) {
-      campaignStatus = "draft";
-    } else if (
-      announcement.eventAt &&
-      now < announcement.eventAt
-    ) {
-      campaignStatus = "upcoming";
-    } else if (
-      announcement.expiresAt &&
-      now >= announcement.expiresAt
-    ) {
-      campaignStatus = "expired";
-    } else {
-      campaignStatus = "active";
+    if (image.size === 0) {
+      throw new ApiError("Announcement image cannot be empty", 400);
     }
 
-    // ========================================================
-    // RESPONSE
-    // ========================================================
+    if (!image.type.startsWith("image/")) {
+      throw new ApiError("Announcement file must be an image", 400);
+    }
 
-    return Response.json(
+    // --------------------------------------------------------
+    // Validate type
+    // --------------------------------------------------------
+
+    const type =
+      typeof typeValue === "string" && typeValue.trim()
+        ? typeValue.trim()
+        : "general";
+
+    if (
+      !announcementTypeEnum.enumValues.includes(
+        type as (typeof announcementTypeEnum.enumValues)[number],
+      )
+    ) {
+      throw new ApiError("Invalid announcement type", 400);
+    }
+
+    // --------------------------------------------------------
+    // Validate optional fields
+    // --------------------------------------------------------
+
+    const title =
+      typeof titleValue === "string" && titleValue.trim()
+        ? titleValue.trim()
+        : null;
+
+    const ctaText =
+      typeof ctaTextValue === "string" && ctaTextValue.trim()
+        ? ctaTextValue.trim()
+        : null;
+
+    const ctaUrl =
+      typeof ctaUrlValue === "string" && ctaUrlValue.trim()
+        ? ctaUrlValue.trim()
+        : null;
+
+    // --------------------------------------------------------
+    // Upload new image to Cloudinary
+    // --------------------------------------------------------
+
+    const uploadedImage = await uploadImageToCloudinary(
+      image,
+      "shoppfd/announcements",
+    );
+
+    uploadedPublicId = uploadedImage.publicId;
+
+    // --------------------------------------------------------
+    // Get current announcement
+    // --------------------------------------------------------
+
+    const existingAnnouncement = await db.query.announcements.findFirst({
+      orderBy: { createdAt: "desc" },
+    });
+
+    // --------------------------------------------------------
+    // Replace database announcement
+    // --------------------------------------------------------
+
+    let newAnnouncement;
+
+    try {
+      [newAnnouncement] = await db.transaction(async (tx) => {
+        // Delete the existing announcement.
+        if (existingAnnouncement) {
+          await tx
+            .delete(announcements)
+            .where(eq(announcements.id, existingAnnouncement.id));
+        }
+
+        // Insert the new announcement.
+        return tx
+          .insert(announcements)
+          .values({
+            type: type as (typeof announcementTypeEnum.enumValues)[number],
+            title,
+            imageUrl: uploadedImage.url,
+            imagePublicId: uploadedImage.publicId,
+            ctaText,
+            ctaUrl,
+          })
+          .returning();
+      });
+    } catch (databaseError) {
+      // The image was already uploaded to Cloudinary.
+      // If the database operation fails, clean up
+      // that newly uploaded image.
+      try {
+        await deleteImageFromCloudinary(uploadedPublicId);
+      } catch (cleanupError) {
+        console.error(
+          "Failed to clean up uploaded announcement image:",
+          cleanupError,
+        );
+      }
+
+      throw databaseError;
+    }
+
+    // --------------------------------------------------------
+    // Delete previous Cloudinary image
+    // --------------------------------------------------------
+
+    if (existingAnnouncement?.imagePublicId) {
+      try {
+        await deleteImageFromCloudinary(existingAnnouncement.imagePublicId);
+      } catch (cloudinaryError) {
+        // Do not fail the successful announcement
+        // creation because old image cleanup failed.
+        console.error(
+          "Failed to delete previous announcement image from Cloudinary:",
+          cloudinaryError,
+        );
+      }
+    }
+
+    // --------------------------------------------------------
+    // Response
+    // --------------------------------------------------------
+
+    return NextResponse.json(
       {
         success: true,
-
+        message: existingAnnouncement
+          ? "Announcement replaced successfully"
+          : "Announcement created successfully",
         data: {
-          ...announcement,
-          campaignStatus,
+          announcement: newAnnouncement,
         },
-
-        message:
-          "Announcement created successfully",
       },
       {
-        status: 201,
+        status: existingAnnouncement ? 200 : 201,
       },
     );
   } catch (error) {
-    console.error(
-      "POST /api/admin/announcements error:",
-      error,
-    );
-
     return handleApiError(error);
   }
 }

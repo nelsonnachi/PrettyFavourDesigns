@@ -1,14 +1,21 @@
 import { StorefrontHeader } from "@/components/(storefront)/header";
 import { StorefrontFooter } from "@/components/(storefront)/footer";
+import { getOptionalUser } from "@/lib/APIs/auth";
 
-export default function StorefrontLayout({
+export default async function StorefrontLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getOptionalUser();
+
+  const isAdmin =
+    user?.role === "admin" ||
+    user?.role === "super_admin";
+
   return (
     <div className="min-h-screen bg-background">
-      <StorefrontHeader />
+      <StorefrontHeader isAdmin={isAdmin} />
 
       <main>{children}</main>
 

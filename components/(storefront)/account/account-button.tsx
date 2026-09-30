@@ -12,38 +12,15 @@ import {
   UserRound,
 } from "lucide-react";
 
-// ============================================================
-// TYPES
-// ============================================================
-
 interface AccountButtonProps {
   isAdmin?: boolean;
 }
-
-// ============================================================
-// ACCOUNT BUTTON
-// ============================================================
-//
-// Signed out:
-// - Shows sign-in button
-//
-// Signed in:
-// - Shows Clerk profile avatar
-// - Dashboard for admins/super admins
-// - My Orders
-// - Clerk's default account/sign-out actions
-//
-// ============================================================
 
 export function AccountButton({
   isAdmin = false,
 }: AccountButtonProps) {
   return (
     <>
-      {/* ======================================================
-          SIGNED OUT
-      ====================================================== */}
-
       <Show when="signed-out">
         <SignInButton mode="modal">
           <button
@@ -59,10 +36,6 @@ export function AccountButton({
         </SignInButton>
       </Show>
 
-      {/* ======================================================
-          SIGNED IN
-      ====================================================== */}
-
       <Show when="signed-in">
         <UserButton
           appearance={{
@@ -72,11 +45,6 @@ export function AccountButton({
           }}
         >
           <UserButton.MenuItems>
-
-            {/* =================================================
-                ADMIN DASHBOARD
-            ================================================= */}
-
             {isAdmin && (
               <UserButton.Link
                 label="Dashboard"
@@ -90,10 +58,6 @@ export function AccountButton({
               />
             )}
 
-            {/* =================================================
-                MY ORDERS
-            ================================================= */}
-
             <UserButton.Link
               label="My Orders"
               href="/orders"
@@ -104,7 +68,6 @@ export function AccountButton({
                 />
               }
             />
-
           </UserButton.MenuItems>
         </UserButton>
       </Show>

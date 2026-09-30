@@ -16,6 +16,10 @@ import { AccountButton } from "@/components/(storefront)/account/account-button"
 import { useCart } from "@/lib/query/cart/cart-queries";
 import { useWishlist } from "@/lib/query/wishlist/wishlist-queries";
 
+interface StorefrontHeaderProps {
+  isAdmin?: boolean;
+}
+
 const navigation = [
   {
     label: "Home",
@@ -35,48 +39,22 @@ const navigation = [
   },
 ];
 
-export function StorefrontHeader() {
-  // ==========================================================
-  // CART DRAWER STATE
-  // ==========================================================
-
-  const [isCartOpen, setIsCartOpen] =
-    useState(false);
-
-  // ==========================================================
-  // CART
-  // ==========================================================
+export function StorefrontHeader({
+  isAdmin = false,
+}: StorefrontHeaderProps) {
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   const { data: cartData } = useCart();
 
-  // ==========================================================
-  // WISHLIST
-  // ==========================================================
+  const { data: wishlist = [] } = useWishlist();
 
-  const {
-    data: wishlist = [],
-  } = useWishlist();
+  const cartItemCount = cartData?.data.itemCount ?? 0;
 
-  // ==========================================================
-  // COUNTS
-  // ==========================================================
-
-  const cartItemCount =  cartData?.data.itemCount ?? 0;
-
-  const wishlistItemCount =
-    wishlist.length;
-
-  // ==========================================================
-  // OPEN CART
-  // ==========================================================
+  const wishlistItemCount = wishlist.length;
 
   function handleOpenCart() {
     setIsCartOpen(true);
   }
-
-  // ==========================================================
-  // CLOSE CART
-  // ==========================================================
 
   function handleCloseCart() {
     setIsCartOpen(false);
@@ -86,11 +64,7 @@ export function StorefrontHeader() {
     <>
       <header className="sticky top-0 z-50 border-b border-border/70 bg-[#faf7f1]/95 backdrop-blur-md">
         <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-10">
-
-          {/* ==================================================
-              LOGO
-          ================================================== */}
-
+          {/* Logo */}
           <Link
             href="/"
             className="group flex flex-col leading-none"
@@ -105,10 +79,7 @@ export function StorefrontHeader() {
             </span>
           </Link>
 
-          {/* ==================================================
-              DESKTOP NAVIGATION
-          ================================================== */}
-
+          {/* Desktop Navigation */}
           <nav className="hidden items-center gap-8 lg:flex">
             {navigation.map((item) => (
               <Link
@@ -121,16 +92,9 @@ export function StorefrontHeader() {
             ))}
           </nav>
 
-          {/* ==================================================
-              ACTIONS
-          ================================================== */}
-
+          {/* Actions */}
           <div className="flex items-center gap-1">
-
-            {/* =================================================
-                SEARCH
-            ================================================= */}
-
+            {/* Search */}
             <Link
               href="/search"
               aria-label="Search"
@@ -142,10 +106,7 @@ export function StorefrontHeader() {
               />
             </Link>
 
-            {/* =================================================
-                WISHLIST
-            ================================================= */}
-
+            {/* Wishlist */}
             {wishlistItemCount > 0 && (
               <Link
                 href="/wishlist"
@@ -165,10 +126,7 @@ export function StorefrontHeader() {
               </Link>
             )}
 
-            {/* =================================================
-                SHOPPING CART
-            ================================================= */}
-
+            {/* Cart */}
             <button
               type="button"
               onClick={handleOpenCart}
@@ -190,29 +148,18 @@ export function StorefrontHeader() {
               )}
             </button>
 
-             {/* =================================================
-                ACCOUNT
-            ================================================= */}
-
+            {/* Account */}
             <div>
-              <AccountButton />
+              <AccountButton isAdmin={isAdmin} />
             </div>
 
-            {/* =================================================
-                MOBILE NAVIGATION
-            ================================================= */}
-
-            <MobileNav
-              navigation={navigation}
-            />
+            {/* Mobile Navigation */}
+            <MobileNav navigation={navigation} />
           </div>
         </div>
       </header>
 
-      {/* ======================================================
-          CART DRAWER
-      ====================================================== */}
-
+      {/* Cart Drawer */}
       <CartDrawer
         open={isCartOpen}
         onClose={handleCloseCart}

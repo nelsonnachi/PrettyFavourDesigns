@@ -1,12 +1,12 @@
 "use client";
 
 import { AdminUsersQuery } from "@/lib/query/customer/admin-user-types";
+
 import {
   RotateCcw,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
-
 
 type CustomerFiltersProps = {
   query: AdminUsersQuery;
@@ -31,7 +31,8 @@ export function CustomerFilters({
         </h2>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
@@ -47,6 +48,35 @@ export function CustomerFilters({
           />
         </div>
 
+        {/* Role */}
+        <select
+          value={query.role}
+          onChange={(event) =>
+            onChange({
+              role:
+                event.target.value as AdminUsersQuery["role"],
+            })
+          }
+          className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
+        >
+          <option value="all">
+            All roles
+          </option>
+
+          <option value="customer">
+            Customers
+          </option>
+
+          <option value="admin">
+            Admins
+          </option>
+
+          <option value="super_admin">
+            Super admins
+          </option>
+        </select>
+
+        {/* Status */}
         <select
           value={query.status}
           onChange={(event) =>
@@ -70,6 +100,7 @@ export function CustomerFilters({
           </option>
         </select>
 
+        {/* Sort */}
         <select
           value={query.sort}
           onChange={(event) =>
@@ -97,6 +128,7 @@ export function CustomerFilters({
           </option>
         </select>
 
+        {/* Limit */}
         <select
           value={String(query.limit)}
           onChange={(event) =>
@@ -106,12 +138,24 @@ export function CustomerFilters({
           }
           className="h-10 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary"
         >
-          <option value="10">10 / page</option>
-          <option value="20">20 / page</option>
-          <option value="50">50 / page</option>
-          <option value="100">100 / page</option>
+          <option value="10">
+            10 / page
+          </option>
+
+          <option value="20">
+            20 / page
+          </option>
+
+          <option value="50">
+            50 / page
+          </option>
+
+          <option value="100">
+            100 / page
+          </option>
         </select>
 
+        {/* Reset */}
         <button
           type="button"
           onClick={onReset}

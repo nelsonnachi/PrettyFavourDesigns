@@ -3,11 +3,13 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Users } from "lucide-react";
+
 import { CustomerPageHeader } from "./customer-page-header";
 import { CustomerStats } from "./customer-stats";
 import { CustomerFilters } from "./customer-filters";
 import { CustomerTable } from "./customer-table";
 import { CustomerPagination } from "./customer-pagination";
+
 import { AdminUsersQuery } from "@/lib/query/customer/admin-user-types";
 import { adminUserKeys } from "@/lib/query/customer/admin-user-keys";
 import { getAdminUsers } from "@/lib/query/customer/admin-user-api";
@@ -17,7 +19,7 @@ const DEFAULT_QUERY: AdminUsersQuery = {
   limit: 10,
   search: "",
   status: "all",
-  role: "customer",
+  role: "all",
   sort: "newest",
 };
 

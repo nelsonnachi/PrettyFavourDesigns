@@ -8,27 +8,36 @@ import {
 
 import {
   ClipboardList,
+  LayoutDashboard,
   UserRound,
 } from "lucide-react";
+
+// ============================================================
+// TYPES
+// ============================================================
+
+interface AccountButtonProps {
+  isAdmin?: boolean;
+}
 
 // ============================================================
 // ACCOUNT BUTTON
 // ============================================================
 //
 // Signed out:
-// - Shows the user icon
-// - Clicking it opens Clerk sign-in
+// - Shows sign-in button
 //
 // Signed in:
-// - Shows the Clerk profile avatar
-// - Dropdown contains:
-//   1. Manage account
-//   2. My Orders
-//   3. Sign out
+// - Shows Clerk profile avatar
+// - Dashboard for admins/super admins
+// - My Orders
+// - Clerk's default account/sign-out actions
 //
 // ============================================================
 
-export function AccountButton() {
+export function AccountButton({
+  isAdmin = false,
+}: AccountButtonProps) {
   return (
     <>
       {/* ======================================================
@@ -62,14 +71,28 @@ export function AccountButton() {
             },
           }}
         >
-          {/* ==================================================
-              CUSTOM MENU ITEMS
-          ================================================== */}
-
           <UserButton.MenuItems>
-            {/* ==================================================
+
+            {/* =================================================
+                ADMIN DASHBOARD
+            ================================================= */}
+
+            {isAdmin && (
+              <UserButton.Link
+                label="Dashboard"
+                href="/admin"
+                labelIcon={
+                  <LayoutDashboard
+                    className="size-4"
+                    strokeWidth={1.6}
+                  />
+                }
+              />
+            )}
+
+            {/* =================================================
                 MY ORDERS
-            ================================================== */}
+            ================================================= */}
 
             <UserButton.Link
               label="My Orders"
@@ -81,6 +104,7 @@ export function AccountButton() {
                 />
               }
             />
+
           </UserButton.MenuItems>
         </UserButton>
       </Show>

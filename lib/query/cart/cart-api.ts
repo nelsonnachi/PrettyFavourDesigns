@@ -38,7 +38,7 @@ export async function updateCartItem(
   quantity: number,
 ) {
   return apiClient<UpdateCartItemResponse>(
-    `/api/cart/${id}`,
+    `/api/cart/items/${id}`,
     {
       method: "PATCH",
 
@@ -55,7 +55,7 @@ export async function updateCartItem(
 
 export async function removeCartItem(id: string) {
   return apiClient<RemoveCartItemResponse>(
-    `/api/cart/${id}`,
+    `/api/cart/items/${id}`,
     {
       method: "DELETE",
     },

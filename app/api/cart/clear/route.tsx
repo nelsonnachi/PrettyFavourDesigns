@@ -1,60 +1,77 @@
-import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
 
-import {
-  carts,
-  cartItems,
-} from "@/db/schema/carts";
+import { carts, cartItems } from "@/db/schema/carts";
 
-import {
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 
-import {
-  getOrCreateCart,
-} from "@/lib/APIs/cart";
+import { cartItemIdParamSchema } from "@/lib/validations";
+
+import { getOrCreateCart } from "@/lib/APIs/cart";
 
 // ============================================================
-// DELETE ALL CART ITEMS
+// DELETE CART ITEM
 // ============================================================
 
-export async function DELETE() {
+export async function DELETE(
+  _request: NextRequest,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  },
+) {
   try {
-    const { cart } =
-      await getOrCreateCart();
-
     // --------------------------------------------------------
-    // Remove all items and update cart timestamp
-    // atomically.
+    // Get current cart
     // --------------------------------------------------------
 
-    await db.transaction(
-      async (tx) => {
-        await tx
-          .delete(cartItems)
-          .where(
-            eq(
-              cartItems.cartId,
-              cart.id,
-            ),
-          );
+    const { cart } = await getOrCreateCart();
 
-        await tx
-          .update(carts)
-          .set({
-            updatedAt:
-              new Date(),
-          })
-          .where(
-            eq(
-              carts.id,
-              cart.id,
-            ),
-          );
-      },
-    );
+    // --------------------------------------------------------
+    // Get route params
+    // --------------------------------------------------------
+
+    const params = await context.params;
+
+    const { id } = cartItemIdParamSchema.parse(params);
+
+    // --------------------------------------------------------
+    // Delete only an item belonging to
+    // the current cart.
+    // --------------------------------------------------------
+
+    const deletedItems = await db
+      .delete(cartItems)
+      .where(and(eq(cartItems.id, id), eq(cartItems.cartId, cart.id)))
+      .returning({
+        id: cartItems.id,
+        quantity: cartItems.quantity,
+      });
+
+    const deletedItem = deletedItems[0];
+
+    // --------------------------------------------------------
+    // Item was not found in current cart
+    // --------------------------------------------------------
+
+    if (!deletedItem) {
+      throw new ApiError("Cart item not found", 404);
+    }
+
+    // --------------------------------------------------------
+    // Update cart timestamp
+    // --------------------------------------------------------
+
+    await db
+      .update(carts)
+      .set({
+        updatedAt: new Date(),
+      })
+      .where(eq(carts.id, cart.id));
 
     // --------------------------------------------------------
     // Response
@@ -63,8 +80,12 @@ export async function DELETE() {
     return NextResponse.json({
       success: true,
 
-      message:
-        "Cart cleared successfully",
+      message: "Item removed from cart",
+
+      data: {
+        id: deletedItem.id,
+        quantity: deletedItem.quantity,
+      },
     });
   } catch (error) {
     return handleApiError(error);

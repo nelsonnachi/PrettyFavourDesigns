@@ -94,7 +94,7 @@ export function CheckoutSubmitButton({
         "cash_on_delivery"
       ) {
         window.location.href = `/checkout/success?order=${encodeURIComponent(
-          order.orderNumber,
+          order.id,
         )}`;
 
         return;

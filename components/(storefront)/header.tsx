@@ -61,8 +61,7 @@ export function StorefrontHeader() {
   // COUNTS
   // ==========================================================
 
-  const cartItemCount =
-    cartData?.data.totalItems ?? 0;
+  const cartItemCount =  cartData?.data.itemCount ?? 0;
 
   const wishlistItemCount =
     wishlist.length;

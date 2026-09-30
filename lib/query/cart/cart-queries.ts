@@ -16,6 +16,7 @@ import { cartKeys } from "./cart-keys";
 
 import type {
   AddToCartInput,
+  CartResponse,
   UpdateCartItemInput,
 } from "./cart-types";
 
@@ -48,6 +49,7 @@ export function useAddToCart() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
+        refetchType: "active",
       });
     },
   });
@@ -69,11 +71,6 @@ export function useUpdateCartItem() {
     },
 
     onSuccess: async () => {
-      // ------------------------------------------------------
-      // Mark the cart query as stale and immediately refetch
-      // active cart queries.
-      // ------------------------------------------------------
-
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
         refetchType: "active",
@@ -94,7 +91,72 @@ export function useRemoveCartItem() {
       return removeCartItem(id);
     },
 
-    onSuccess: async () => {
+    onSuccess: async (_, deletedItemId) => {
+      // ------------------------------------------------------
+      // Immediately remove the item from the cached cart.
+      // This makes the UI respond immediately after a
+      // successful DELETE request.
+      // ------------------------------------------------------
+
+      queryClient.setQueryData<CartResponse>(
+        cartKeys.current(),
+        (currentData) => {
+          if (!currentData?.data) {
+            return currentData;
+          }
+
+          const currentCart =
+            currentData.data;
+
+          const deletedItem =
+            currentCart.items.find(
+              (item) =>
+                item.id === deletedItemId,
+            );
+
+          if (!deletedItem) {
+            return currentData;
+          }
+
+          const nextItems =
+            currentCart.items.filter(
+              (item) =>
+                item.id !== deletedItemId,
+            );
+
+          return {
+            ...currentData,
+
+            data: {
+              ...currentCart,
+
+              items: nextItems,
+
+              // Keep distinct-item count correct.
+              itemCount:
+                nextItems.length,
+
+              // Remove the deleted item's quantity
+              // from the total quantity.
+              totalItems:
+                currentCart.totalItems -
+                deletedItem.quantity,
+
+              // Remove the deleted item's subtotal.
+              subtotal:
+                currentCart.subtotal -
+                Number(
+                  deletedItem.subtotal,
+                ),
+            },
+          };
+        },
+      );
+
+      // ------------------------------------------------------
+      // Refetch from server to guarantee synchronization.
+      // ------------------------------------------------------
+
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
         refetchType: "active",
@@ -114,6 +176,39 @@ export function useClearCart() {
     mutationFn: clearCart,
 
     onSuccess: async () => {
+      // ------------------------------------------------------
+      // Clear the cached cart immediately.
+      // ------------------------------------------------------
+
+      queryClient.setQueryData<CartResponse>(
+        cartKeys.current(),
+        (currentData) => {
+          if (!currentData?.data) {
+            return currentData;
+          }
+
+          return {
+            ...currentData,
+
+            data: {
+              ...currentData.data,
+
+              items: [],
+
+              totalItems: 0,
+
+              itemCount: 0,
+
+              subtotal: 0,
+            },
+          };
+        },
+      );
+
+      // ------------------------------------------------------
+      // Refetch to guarantee synchronization.
+      // ------------------------------------------------------
+
       await queryClient.invalidateQueries({
         queryKey: cartKeys.current(),
         refetchType: "active",

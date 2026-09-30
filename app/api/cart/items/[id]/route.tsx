@@ -1,36 +1,20 @@
-import {
-  NextRequest,
-  NextResponse,
-} from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-import {
-  eq,
-  and,
-} from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
 
-import {
-  carts,
-  cartItems,
-} from "@/db/schema/carts";
+import { carts, cartItems } from "@/db/schema/carts";
 
-import {
-  ApiError,
-  handleApiError,
-} from "@/lib/APIs/api-errors";
+import { ApiError, handleApiError } from "@/lib/APIs/api-errors";
 
-import {
-  updateCartItemSchema,
-  cartItemIdParamSchema,
-} from "@/lib/validations";
+import { updateCartItemSchema, cartItemIdParamSchema } from "@/lib/validations";
 
-import {
-  getOrCreateCart,
-} from "@/lib/APIs/cart";
+import { getOrCreateCart } from "@/lib/APIs/cart";
 
 // ============================================================
 // UPDATE CART ITEM
+// PATCH /api/cart/items/[id]
 // ============================================================
 
 export async function PATCH(
@@ -43,107 +27,94 @@ export async function PATCH(
 ) {
   try {
     // --------------------------------------------------------
-    // Get or create cart
+    // Get current cart
     // --------------------------------------------------------
 
-    const { cart } =
-      await getOrCreateCart();
+    const { cart } = await getOrCreateCart();
 
     // --------------------------------------------------------
     // Get route params
     // --------------------------------------------------------
 
-    const params =
-      await context.params;
+    const params = await context.params;
 
-    const { id } =
-      cartItemIdParamSchema.parse(
-        params,
-      );
+    const { id } = cartItemIdParamSchema.parse(params);
 
     // --------------------------------------------------------
     // Read request body
     // --------------------------------------------------------
 
-    const body =
-      await request.json();
+    const body = await request.json();
 
     // --------------------------------------------------------
     // Validate quantity
     // --------------------------------------------------------
 
-    const data =
-      updateCartItemSchema.parse(
-        body,
-      );
+    const data = updateCartItemSchema.parse(body);
 
     // --------------------------------------------------------
     // Find cart item
     // --------------------------------------------------------
 
-    const item =
-      await db.query.cartItems.findFirst({
-        where: {
-          id,
-          cartId: cart.id,
+    const item = await db.query.cartItems.findFirst({
+      where: {
+        id,
+        cartId: cart.id,
+      },
+
+      columns: {
+        id: true,
+        quantity: true,
+        productId: true,
+        variantId: true,
+      },
+
+      with: {
+        // --------------------------------------------------
+        // PRODUCT
+        // --------------------------------------------------
+
+        product: {
+          columns: {
+            status: true,
+            deletedAt: true,
+          },
         },
 
-        columns: {
-          id: true,
-          quantity: true,
-          productId: true,
-          variantId: true,
-        },
+        // --------------------------------------------------
+        // VARIANT
+        // --------------------------------------------------
 
-        with: {
-          // --------------------------------------------------
-          // PRODUCT
-          // --------------------------------------------------
-
-          product: {
-            columns: {
-              status: true,
-              deletedAt: true,
-            },
+        variant: {
+          columns: {
+            stock: true,
+            reservedStock: true,
           },
 
-          // --------------------------------------------------
-          // VARIANT
-          // --------------------------------------------------
-
-          variant: {
-            columns: {
-              stock: true,
-              reservedStock: true,
-            },
-
-            // ------------------------------------------------
+          with: {
+            // ----------------------------------------------
             // COLOR
-            // ------------------------------------------------
+            // ----------------------------------------------
 
-            with: {
-              color: {
-                columns: {
-                  id: true,
-                  name: true,
-                  hexCode: true,
-                  isActive: true,
-                },
+            color: {
+              columns: {
+                id: true,
+                name: true,
+                hexCode: true,
+                isActive: true,
               },
             },
           },
         },
-      });
+      },
+    });
 
     // --------------------------------------------------------
     // Cart item must exist
     // --------------------------------------------------------
 
     if (!item) {
-      throw new ApiError(
-        "Cart item not found",
-        404,
-      );
+      throw new ApiError("Cart item not found", 404);
     }
 
     // --------------------------------------------------------
@@ -183,54 +154,35 @@ export async function PATCH(
     // Product availability
     // --------------------------------------------------------
 
-    if (
-      item.product.deletedAt ||
-      item.product.status !==
-        "active"
-    ) {
-      throw new ApiError(
-        "This product is no longer available",
-        400,
-      );
+    if (item.product.deletedAt || item.product.status !== "active") {
+      throw new ApiError("This product is no longer available", 400);
     }
 
     // --------------------------------------------------------
     // Color availability
     // --------------------------------------------------------
 
-    if (
-      !item.variant.color.isActive
-    ) {
-      throw new ApiError(
-        "This product color is no longer available",
-        400,
-      );
+    if (!item.variant.color.isActive) {
+      throw new ApiError("This product color is no longer available", 400);
     }
 
     // --------------------------------------------------------
     // Calculate available stock
     // --------------------------------------------------------
 
-    const availableStock =
-      Math.max(
-        item.variant.stock -
-          item.variant.reservedStock,
-        0,
-      );
+    const availableStock = Math.max(
+      item.variant.stock - item.variant.reservedStock,
+      0,
+    );
 
     // --------------------------------------------------------
     // Check requested quantity
     // --------------------------------------------------------
 
-    if (
-      data.quantity >
-      availableStock
-    ) {
+    if (data.quantity > availableStock) {
       throw new ApiError(
         `Only ${availableStock} item${
-          availableStock === 1
-            ? ""
-            : "s"
+          availableStock === 1 ? "" : "s"
         } available`,
         400,
       );
@@ -240,43 +192,23 @@ export async function PATCH(
     // Update cart item
     // --------------------------------------------------------
 
-    const updatedResult =
-      await db
-        .update(cartItems)
-        .set({
-          quantity:
-            data.quantity,
+    const updatedResult = await db
+      .update(cartItems)
+      .set({
+        quantity: data.quantity,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(cartItems.id, id), eq(cartItems.cartId, cart.id)))
+      .returning();
 
-          updatedAt:
-            new Date(),
-        })
-        .where(
-          and(
-            eq(
-              cartItems.id,
-              id,
-            ),
-
-            eq(
-              cartItems.cartId,
-              cart.id,
-            ),
-          ),
-        )
-        .returning();
-
-    const updatedItem =
-      updatedResult[0];
+    const updatedItem = updatedResult[0];
 
     // --------------------------------------------------------
     // Make sure update succeeded
     // --------------------------------------------------------
 
     if (!updatedItem) {
-      throw new ApiError(
-        "Failed to update cart item",
-        500,
-      );
+      throw new ApiError("Failed to update cart item", 500);
     }
 
     // --------------------------------------------------------
@@ -286,15 +218,9 @@ export async function PATCH(
     await db
       .update(carts)
       .set({
-        updatedAt:
-          new Date(),
+        updatedAt: new Date(),
       })
-      .where(
-        eq(
-          carts.id,
-          cart.id,
-        ),
-      );
+      .where(eq(carts.id, cart.id));
 
     // --------------------------------------------------------
     // Response
@@ -302,10 +228,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-
-      message:
-        "Cart item updated successfully",
-
+      message: "Cart item updated successfully",
       data: updatedItem,
     });
   } catch (error) {
@@ -315,10 +238,11 @@ export async function PATCH(
 
 // ============================================================
 // DELETE CART ITEM
+// DELETE /api/cart/items/[id]
 // ============================================================
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   context: {
     params: Promise<{
       id: string;
@@ -327,58 +251,43 @@ export async function DELETE(
 ) {
   try {
     // --------------------------------------------------------
-    // Get or create cart
+    // Get current cart
     // --------------------------------------------------------
 
-    const { cart } =
-      await getOrCreateCart();
+    const { cart } = await getOrCreateCart();
 
     // --------------------------------------------------------
     // Get route params
     // --------------------------------------------------------
 
-    const params =
-      await context.params;
+    const params = await context.params;
 
-    const { id } =
-      cartItemIdParamSchema.parse(
-        params,
-      );
+    const { id } = cartItemIdParamSchema.parse(params);
 
     // --------------------------------------------------------
     // Delete cart item
+    //
+    // The cart ID restriction ensures that a user
+    // can only delete an item belonging to their
+    // own current cart.
     // --------------------------------------------------------
 
-    const result =
-      await db
-        .delete(cartItems)
-        .where(
-          and(
-            eq(
-              cartItems.id,
-              id,
-            ),
+    const deletedItems = await db
+      .delete(cartItems)
+      .where(and(eq(cartItems.id, id), eq(cartItems.cartId, cart.id)))
+      .returning({
+        id: cartItems.id,
+        quantity: cartItems.quantity,
+      });
 
-            eq(
-              cartItems.cartId,
-              cart.id,
-            ),
-          ),
-        )
-        .returning();
-
-    const deletedItem =
-      result[0];
+    const deletedItem = deletedItems[0];
 
     // --------------------------------------------------------
     // Make sure item existed
     // --------------------------------------------------------
 
     if (!deletedItem) {
-      throw new ApiError(
-        "Cart item not found",
-        404,
-      );
+      throw new ApiError("Cart item not found", 404);
     }
 
     // --------------------------------------------------------
@@ -388,15 +297,9 @@ export async function DELETE(
     await db
       .update(carts)
       .set({
-        updatedAt:
-          new Date(),
+        updatedAt: new Date(),
       })
-      .where(
-        eq(
-          carts.id,
-          cart.id,
-        ),
-      );
+      .where(eq(carts.id, cart.id));
 
     // --------------------------------------------------------
     // Response
@@ -404,9 +307,8 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-
-      message:
-        "Item removed from cart",
+      message: "Item removed from cart",
+      data: deletedItem,
     });
   } catch (error) {
     return handleApiError(error);

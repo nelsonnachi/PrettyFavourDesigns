@@ -81,7 +81,7 @@ export function CartDrawer({
   // CART COUNT
   // ==========================================================
 
-  const itemCount = cart?.totalItems ?? 0;
+  const itemCount = cart?.itemCount ?? 0;
 
   return (
     <>

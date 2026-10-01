@@ -216,10 +216,17 @@ export function CheckoutSummary({
 
         {/* SHIPPING */}
 
-        <div className="mt-3 flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Shipping</span>
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Shipping</span>
 
-          <span className="font-medium">Free</span>
+            <span className="font-medium">Excluding shipping fee</span>
+          </div>
+
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Shipping fee is not included in the total. We will contact you after
+            your order to confirm the delivery fee based on your location.
+          </p>
         </div>
 
         {/* TOTAL */}

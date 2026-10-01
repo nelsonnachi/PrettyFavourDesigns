@@ -8,6 +8,7 @@ import {
 import { orderKeys } from "./order-keys";
 import type { UpdateOrderStatusInput } from "./order-types";
 import { adminPaymentKeys } from "../payments/payment-keys";
+import { productKeys } from "@/lib/query/products/product-keys";
 
 // ============================================================
 // CANCEL CUSTOMER ORDER
@@ -17,7 +18,8 @@ export function useCancelCustomerOrder() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (orderId: string) => cancelCustomerOrder(orderId),
+    mutationFn: (orderId: string) =>
+      cancelCustomerOrder(orderId),
 
     onSuccess: (_data, orderId) => {
       queryClient.invalidateQueries({
@@ -64,7 +66,9 @@ export function useUpdateAdminOrderStatus() {
       // --------------------------------------------------------
 
       queryClient.invalidateQueries({
-        queryKey: orderKeys.admin.detail(variables.orderId),
+        queryKey: orderKeys.admin.detail(
+          variables.orderId,
+        ),
       });
 
       // --------------------------------------------------------
@@ -75,15 +79,30 @@ export function useUpdateAdminOrderStatus() {
       // When delivered:
       // payment.status changes pending → paid
       //
-      // This invalidates:
-      // - payment list
-      // - payment details
-      // - payment sales summary
-      // - daily sales
       // --------------------------------------------------------
 
       queryClient.invalidateQueries({
         queryKey: adminPaymentKeys.all,
+      });
+
+      // --------------------------------------------------------
+      // REFRESH ADMIN PRODUCTS
+      //
+      // Important for TopProducts:
+      //
+      // COD completion increments:
+      //
+      // products.soldCount
+      //
+      // TopProducts uses useAdminProducts()
+      // with sort: "best_selling".
+      //
+      // This invalidates that cached product list so
+      // the updated soldCount is fetched immediately.
+      // --------------------------------------------------------
+
+      queryClient.invalidateQueries({
+        queryKey: productKeys.adminLists(),
       });
     },
   });

@@ -9,21 +9,21 @@ import { Star } from "lucide-react";
 const testimonials = [
   {
     id: 1,
-    name: "Amara Okafor",
-    location: "Lagos, Nigeria",
-    avatarUrl: "/images/testimonials/avatar.jpg",
-    rating: 5,
-    quote:
-      "The craftsmanship is incredible. My tote still looks brand new after a year of daily use, and I get compliments on it constantly.",
-  },
-  {
-    id: 2,
-    name: "Ifeoma Adeyemi",
+    name: "Mrs Eberechi",
     location: "Abuja, Nigeria",
     avatarUrl: "/images/testimonials/avatar.jpg",
     rating: 5,
     quote:
-      "You can tell every bag is made with real care. Mine arrived beautifully packaged and the leather only gets better with time.",
+      "I started with a lunch bag for my kids... Now I am hooked. The quality of the handbags, my backpack and the kids school bag is unmatched. The hand work and detailing are solid. I will always come back.",
+  },
+  {
+    id: 2,
+    name: "Sophia Naza",
+    location: "Abuja, Nigeria",
+    avatarUrl: "/images/testimonials/avatar.jpg",
+    rating: 5,
+    quote:
+      "I got my bag. I love the design and the quality looks strong as well. Thank you so much Shoppfd for my bag, I really like it.",
   },
   {
     id: 3,
@@ -32,7 +32,7 @@ const testimonials = [
     avatarUrl: "/images/testimonials/avatar.jpg",
     rating: 4,
     quote:
-      "Exactly what I was looking for — timeless, well made and functional enough for everyday life. Already planning my next order.",
+      "If you would still remember the bag i got from you some time ago. It's really lovely. And i'm still using it. Funny how you actually told me the bag would last me for a long time. And it eventually did. It's very strong",
   },
 ];
 

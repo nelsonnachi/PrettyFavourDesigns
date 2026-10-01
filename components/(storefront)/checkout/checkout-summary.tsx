@@ -4,7 +4,7 @@ import Image from "next/image";
 
 import { useCart } from "@/lib/query/cart/cart-queries";
 
-import { CheckoutDiscountCode } from "./checkout-discount-code"; // NEW
+import { CheckoutDiscountCode } from "./checkout-discount-code";
 
 function formatNaira(value: string | number) {
   return new Intl.NumberFormat("en-NG", {
@@ -14,7 +14,6 @@ function formatNaira(value: string | number) {
   }).format(Number(value));
 }
 
-// NEW: everything the discount part needs from CheckoutForm
 type CheckoutSummaryProps = {
   appliedCode: string | null;
   discountAmount: number;
@@ -42,15 +41,13 @@ export function CheckoutSummary({
 
   if (isLoading) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+      <div className="min-w-0 overflow-hidden rounded-3xl border border-border bg-card p-4 sm:p-6">
+        <div className="h-6 w-32 max-w-full animate-pulse rounded bg-muted" />
 
-        <div className="mt-6 space-y-5">
-          <div className="h-20 animate-pulse rounded-xl bg-muted" />
-
-          <div className="h-20 animate-pulse rounded-xl bg-muted" />
-
-          <div className="h-20 animate-pulse rounded-xl bg-muted" />
+        <div className="mt-6 min-w-0 space-y-5">
+          <div className="h-20 w-full animate-pulse rounded-xl bg-muted" />
+          <div className="h-20 w-full animate-pulse rounded-xl bg-muted" />
+          <div className="h-20 w-full animate-pulse rounded-xl bg-muted" />
         </div>
       </div>
     );
@@ -62,10 +59,10 @@ export function CheckoutSummary({
 
   if (!cart || cart.items.length === 0) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="min-w-0 overflow-hidden rounded-3xl border border-border bg-card p-4 sm:p-6">
         <h2 className="text-lg font-semibold">Order summary</h2>
 
-        <p className="mt-3 text-sm text-muted-foreground">
+        <p className="mt-3 break-words text-sm text-muted-foreground">
           Your cart is empty.
         </p>
       </div>
@@ -73,11 +70,8 @@ export function CheckoutSummary({
   }
 
   // ============================================================
-  // TOTAL (NEW: subtotal minus the discount)
+  // TOTAL
   // ============================================================
-  //
-  // This is only what we SHOW. The server works out the real
-  // total again when the order is created.
 
   const total = Math.max(cart.subtotal - discountAmount, 0);
 
@@ -86,16 +80,19 @@ export function CheckoutSummary({
   // ============================================================
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6 sm:p-7">
+    <div className="min-w-0 overflow-hidden rounded-3xl border border-border bg-card p-4 sm:p-6 lg:p-7">
       {/* ================================================== */}
       {/* HEADER */}
       {/* ================================================== */}
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Order summary</h2>
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <h2 className="min-w-0 break-words text-lg font-semibold">
+          Order summary
+        </h2>
 
-        <span className="text-sm text-muted-foreground">
-          {cart.totalItems} {cart.totalItems === 1 ? "item" : "items"}
+        <span className="shrink-0 text-sm text-muted-foreground">
+          {cart.totalItems}{" "}
+          {cart.totalItems === 1 ? "item" : "items"}
         </span>
       </div>
 
@@ -103,24 +100,27 @@ export function CheckoutSummary({
       {/* ITEMS */}
       {/* ================================================== */}
 
-      <div className="mt-6 divide-y divide-border">
+      <div className="mt-6 min-w-0 divide-y divide-border">
         {cart.items.map((item) => (
-          <div key={item.id} className="flex gap-4 py-5 first:pt-0 last:pb-0">
+          <div
+            key={item.id}
+            className="flex min-w-0 gap-3 py-5 first:pt-0 last:pb-0 sm:gap-4"
+          >
             {/* ================================================== */}
             {/* PRODUCT IMAGE */}
             {/* ================================================== */}
 
-            <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-secondary">
+            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-secondary sm:h-20 sm:w-20">
               {item.product.imageUrl ? (
                 <Image
                   src={item.product.imageUrl}
                   alt={item.product.name}
                   fill
-                  sizes="80px"
+                  sizes="(max-width: 640px) 64px, 80px"
                   className="object-cover"
                 />
               ) : (
-                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                <div className="flex h-full w-full items-center justify-center px-1 text-center text-[10px] text-muted-foreground">
                   No image
                 </div>
               )}
@@ -131,41 +131,45 @@ export function CheckoutSummary({
             {/* ================================================== */}
 
             <div className="min-w-0 flex-1">
-              <p className="line-clamp-2 text-sm font-medium">
-                {item.product.name}
-              </p>
+              {/* Product name + price */}
+
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <p className="min-w-0 flex-1 break-words text-sm font-medium leading-5">
+                  {item.product.name}
+                </p>
+
+                <span className="shrink-0 text-right text-sm font-medium">
+                  {formatNaira(item.subtotal)}
+                </span>
+              </div>
 
               {/* ================================================== */}
               {/* COLOR */}
               {/* ================================================== */}
 
               {item.variant?.color && (
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-2 flex min-w-0 items-center gap-2">
                   <span
-                    className="h-3 w-3 rounded-full border border-border"
+                    className="h-3 w-3 shrink-0 rounded-full border border-border"
                     style={{
                       backgroundColor:
                         item.variant.color.hexCode ?? "transparent",
                     }}
                   />
 
-                  <span className="text-xs text-muted-foreground">
+                  <span className="min-w-0 break-words text-xs text-muted-foreground">
                     {item.variant.color.name}
                   </span>
                 </div>
               )}
 
               {/* ================================================== */}
-              {/* QUANTITY + PRICE */}
+              {/* QUANTITY */}
               {/* ================================================== */}
 
-              <div className="mt-2 flex items-center justify-between gap-3">
+              <div className="mt-2">
                 <span className="text-xs text-muted-foreground">
                   Qty: {item.quantity}
-                </span>
-
-                <span className="text-sm font-medium">
-                  {formatNaira(item.subtotal)}
                 </span>
               </div>
             </div>
@@ -174,10 +178,10 @@ export function CheckoutSummary({
       </div>
 
       {/* ================================================== */}
-      {/* DISCOUNT CODE (NEW) */}
+      {/* DISCOUNT CODE */}
       {/* ================================================== */}
 
-      <div className="mt-7 border-t border-border pt-5">
+      <div className="mt-7 min-w-0 border-t border-border pt-5">
         <CheckoutDiscountCode
           appliedCode={appliedCode}
           isChecking={isCheckingDiscount}
@@ -191,24 +195,29 @@ export function CheckoutSummary({
       {/* TOTALS */}
       {/* ================================================== */}
 
-      <div className="mt-5 border-t border-border pt-5">
+      <div className="mt-5 min-w-0 border-t border-border pt-5">
         {/* SUBTOTAL */}
 
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Subtotal</span>
+        <div className="flex min-w-0 items-center justify-between gap-4 text-sm">
+          <span className="min-w-0 text-muted-foreground">
+            Subtotal
+          </span>
 
-          <span className="font-medium">{formatNaira(cart.subtotal)}</span>
+          <span className="shrink-0 font-medium">
+            {formatNaira(cart.subtotal)}
+          </span>
         </div>
 
-        {/* DISCOUNT (NEW: only shown when a discount is applied) */}
+        {/* DISCOUNT */}
 
         {discountAmount > 0 && (
-          <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              Discount{appliedCode ? ` (${appliedCode})` : ""}
+          <div className="mt-3 flex min-w-0 items-start justify-between gap-4 text-sm">
+            <span className="min-w-0 break-words text-muted-foreground">
+              Discount
+              {appliedCode ? ` (${appliedCode})` : ""}
             </span>
 
-            <span className="font-medium text-green-600">
+            <span className="shrink-0 font-medium text-green-600">
               -{formatNaira(discountAmount)}
             </span>
           </div>
@@ -216,25 +225,34 @@ export function CheckoutSummary({
 
         {/* SHIPPING */}
 
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Shipping</span>
+        <div className="mt-4 min-w-0">
+          <div className="flex min-w-0 items-start justify-between gap-4 text-sm">
+            <span className="shrink-0 text-muted-foreground">
+              Shipping
+            </span>
 
-            <span className="font-medium">Excluding shipping fee</span>
+            <span className="min-w-0 break-words text-right font-medium">
+              Excluding shipping fee
+            </span>
           </div>
 
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Shipping fee is not included in the total. We will contact you after
-            your order to confirm the delivery fee based on your location.
+          <p className="mt-2 break-words text-xs leading-5 text-muted-foreground">
+            Shipping fee is not included in the total. We will contact
+            you after your order to confirm the delivery fee based on
+            your location.
           </p>
         </div>
 
         {/* TOTAL */}
 
-        <div className="mt-5 flex items-center justify-between border-t border-border pt-5">
-          <span className="font-semibold">Total</span>
+        <div className="mt-5 flex min-w-0 items-center justify-between gap-4 border-t border-border pt-5">
+          <span className="shrink-0 font-semibold">
+            Total
+          </span>
 
-          <span className="text-xl font-semibold">{formatNaira(total)}</span>
+          <span className="shrink-0 text-lg font-semibold sm:text-xl">
+            {formatNaira(total)}
+          </span>
         </div>
       </div>
     </div>

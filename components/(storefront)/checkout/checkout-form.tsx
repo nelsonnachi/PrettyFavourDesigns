@@ -56,7 +56,7 @@ export function CheckoutForm() {
           {/* LEFT */}
           {/* ================================================== */}
 
-          <div className="space-y-10">
+          <div className="min-w-0 space-y-10">
             <CheckoutAddressSection
               selectedAddressId={selectedAddressId}
               onSelectAddress={setSelectedAddressId}
@@ -82,7 +82,7 @@ export function CheckoutForm() {
           {/* RIGHT */}
           {/* ================================================== */}
 
-          <aside className="lg:sticky lg:top-8 lg:self-start">
+          <aside className="min-w-0 lg:sticky lg:top-8 lg:self-start">
             <CheckoutSummary
               appliedCode={appliedCode}
               discountAmount={discountAmount}

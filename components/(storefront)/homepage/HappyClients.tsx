@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { Star } from "lucide-react";
 
 /*
@@ -11,7 +10,6 @@ const testimonials = [
     id: 1,
     name: "Mrs Eberechi",
     location: "Abuja, Nigeria",
-    avatarUrl: "/images/testimonials/avatar.jpg",
     rating: 5,
     quote:
       "I started with a lunch bag for my kids... Now I am hooked. The quality of the handbags, my backpack and the kids school bag is unmatched. The hand work and detailing are solid. I will always come back.",
@@ -20,7 +18,6 @@ const testimonials = [
     id: 2,
     name: "Sophia Naza",
     location: "Abuja, Nigeria",
-    avatarUrl: "/images/testimonials/avatar.jpg",
     rating: 5,
     quote:
       "I got my bag. I love the design and the quality looks strong as well. Thank you so much Shoppfd for my bag, I really like it.",
@@ -29,12 +26,21 @@ const testimonials = [
     id: 3,
     name: "Chidinma Eze",
     location: "Port Harcourt, Nigeria",
-    avatarUrl: "/images/testimonials/avatar.jpg",
     rating: 4,
     quote:
       "If you would still remember the bag i got from you some time ago. It's really lovely. And i'm still using it. Funny how you actually told me the bag would last me for a long time. And it eventually did. It's very strong",
   },
 ];
+
+function getInitials(name: string) {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 export function HappyClients() {
   return (
@@ -46,7 +52,7 @@ export function HappyClients() {
         {/* Section header */}
         <div className="mb-7 sm:mb-8 lg:mb-9">
           <h2
-            id="our-collection-heading"
+            id="happy-clients-heading"
             className="font-serif text-[34px] font-medium leading-none tracking-[-0.025em] text-[#211b17] sm:text-[38px] lg:text-[42px]"
           >
             Happy Clients
@@ -64,6 +70,7 @@ export function HappyClients() {
               key={testimonial.id}
               className="flex flex-col border border-border bg-card px-6 py-7"
             >
+              {/* Rating */}
               <div className="flex items-center gap-0.5">
                 {Array.from({ length: 5 }).map((_, index) => (
                   <Star
@@ -78,25 +85,29 @@ export function HappyClients() {
                 ))}
               </div>
 
+              {/* Testimonial */}
               <blockquote className="mt-4 flex-1 text-[13px] leading-[1.7] text-card-foreground">
                 "{testimonial.quote}"
               </blockquote>
 
+              {/* Client */}
               <figcaption className="mt-6 flex items-center gap-3">
-                <div className="relative size-10 shrink-0 overflow-hidden bg-muted">
-                  <Image
-                    src={testimonial.avatarUrl}
-                    alt={testimonial.name}
-                    fill
-                    sizes="40px"
-                    className="object-cover"
-                  />
+                {/* Avatar / Initials */}
+                <div
+                  aria-hidden="true"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary"
+                >
+                  <span className="text-[11px] font-semibold tracking-wide text-foreground">
+                    {getInitials(testimonial.name)}
+                  </span>
                 </div>
 
+                {/* Client information */}
                 <div>
                   <p className="text-[12px] font-semibold text-card-foreground">
                     {testimonial.name}
                   </p>
+
                   <p className="text-[11px] text-muted-foreground">
                     {testimonial.location}
                   </p>

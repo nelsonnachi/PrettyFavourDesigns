@@ -4,6 +4,8 @@ import Image from "next/image";
 
 import { useCart } from "@/lib/query/cart/cart-queries";
 
+import { CheckoutDiscountCode } from "./checkout-discount-code"; // NEW
+
 function formatNaira(value: string | number) {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -12,7 +14,24 @@ function formatNaira(value: string | number) {
   }).format(Number(value));
 }
 
-export function CheckoutSummary() {
+// NEW: everything the discount part needs from CheckoutForm
+type CheckoutSummaryProps = {
+  appliedCode: string | null;
+  discountAmount: number;
+  isCheckingDiscount: boolean;
+  discountError: string;
+  onApplyCode: (code: string) => void;
+  onRemoveCode: () => void;
+};
+
+export function CheckoutSummary({
+  appliedCode,
+  discountAmount,
+  isCheckingDiscount,
+  discountError,
+  onApplyCode,
+  onRemoveCode,
+}: CheckoutSummaryProps) {
   const { data, isLoading } = useCart();
 
   const cart = data?.data;
@@ -52,6 +71,15 @@ export function CheckoutSummary() {
       </div>
     );
   }
+
+  // ============================================================
+  // TOTAL (NEW: subtotal minus the discount)
+  // ============================================================
+  //
+  // This is only what we SHOW. The server works out the real
+  // total again when the order is created.
+
+  const total = Math.max(cart.subtotal - discountAmount, 0);
 
   // ============================================================
   // ORDER SUMMARY
@@ -146,10 +174,24 @@ export function CheckoutSummary() {
       </div>
 
       {/* ================================================== */}
-      {/* TOTALS */}
+      {/* DISCOUNT CODE (NEW) */}
       {/* ================================================== */}
 
       <div className="mt-7 border-t border-border pt-5">
+        <CheckoutDiscountCode
+          appliedCode={appliedCode}
+          isChecking={isCheckingDiscount}
+          errorMessage={discountError}
+          onApply={onApplyCode}
+          onRemove={onRemoveCode}
+        />
+      </div>
+
+      {/* ================================================== */}
+      {/* TOTALS */}
+      {/* ================================================== */}
+
+      <div className="mt-5 border-t border-border pt-5">
         {/* SUBTOTAL */}
 
         <div className="flex items-center justify-between text-sm">
@@ -157,6 +199,20 @@ export function CheckoutSummary() {
 
           <span className="font-medium">{formatNaira(cart.subtotal)}</span>
         </div>
+
+        {/* DISCOUNT (NEW: only shown when a discount is applied) */}
+
+        {discountAmount > 0 && (
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              Discount{appliedCode ? ` (${appliedCode})` : ""}
+            </span>
+
+            <span className="font-medium text-green-600">
+              -{formatNaira(discountAmount)}
+            </span>
+          </div>
+        )}
 
         {/* SHIPPING */}
 
@@ -171,9 +227,7 @@ export function CheckoutSummary() {
         <div className="mt-5 flex items-center justify-between border-t border-border pt-5">
           <span className="font-semibold">Total</span>
 
-          <span className="text-xl font-semibold">
-            {formatNaira(cart.subtotal)}
-          </span>
+          <span className="text-xl font-semibold">{formatNaira(total)}</span>
         </div>
       </div>
     </div>

@@ -3,14 +3,10 @@ export function BrandStory() {
     <section className="border-b border-border">
       <div className="mx-auto max-w-[1440px] px-5 py-20 sm:px-8 sm:py-24 lg:px-12 lg:py-32">
         <div className="grid gap-12 lg:grid-cols-[220px_minmax(0,760px)] lg:gap-20">
-          {/* LABEL */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-              Where it began
-            </p>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+            Where it began
+          </p>
 
-          {/* STORY */}
           <div>
             <h2 className="font-serif text-4xl leading-tight tracking-[-0.03em] text-[#211b17] sm:text-5xl">
               It started with a simple need and a little curiosity.
@@ -18,7 +14,7 @@ export function BrandStory() {
 
             <div className="mt-8 space-y-6 text-sm leading-8 text-[#756a60] sm:text-base">
               <p>
-                I needed a bag, but I couldn't afford the one I wanted. So I thought, "Why not try making one myself?." With no idea that it would grow into a business, I created my first bag from scratch - and to my surprise, it came out beautifully. 
+                I needed a bag, but I couldn't afford the one I wanted. So I thought, "Why not try making one myself?." With no idea that it would grow into a business, I created my first bag from scratch - and to my surprise, it came out beautifully.
               </p>
 
               <p>
@@ -30,7 +26,7 @@ export function BrandStory() {
               </p>
 
               <p>
-                Today, SHOPPFD is a proudly growing brand creating beautiful, stylish and thoughtfully crafted bags for different needs and occasions. What started with <strong>"Let me try"</strong> has grown into a passion for crafting pieces that people are happy to carry.  
+                Today, SHOPPFD is a proudly growing brand creating beautiful, stylish and thoughtfully crafted bags for different needs and occasions. What started with <strong>"Let me try"</strong> has grown into a passion for crafting pieces that people are happy to carry.
               </p>
 
               <p>AND THIS IS JUST THE BEGINNING</p>

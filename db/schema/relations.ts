@@ -42,6 +42,11 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.users.id,
       to: r.inventoryMovements.userId,
     }),
+
+    discountUsages: r.many.discountUsages({
+      from: r.users.id,
+      to: r.discountUsages.userId,
+    }),
   },
 
   // =========================================================
@@ -236,6 +241,18 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.orders.id,
       to: r.inventoryMovements.orderId,
     }),
+
+    // Requires the discountId column on the orders table
+    appliedDiscount: r.one.discounts({
+      from: r.orders.discountId,
+      to: r.discounts.id,
+    }),
+
+    // orderId is unique in discountUsages, so an order has at most one usage
+    discountUsage: r.one.discountUsages({
+      from: r.orders.id,
+      to: r.discountUsages.orderId,
+    }),
   },
 
   // =========================================================
@@ -335,12 +352,6 @@ export const relations = defineRelations(schema, (r) => ({
   },
 
   // =========================================================
-  // ANNOUNCEMENTS
-  // =========================================================
-
-  announcements: {},
-
-  // =========================================================
   // CONTACT MESSAGES
   // =========================================================
 
@@ -350,12 +361,6 @@ export const relations = defineRelations(schema, (r) => ({
       to: r.users.id,
     }),
   },
-
-  // =========================================================
-  // NEWSLETTER
-  // =========================================================
-
-  newsletterSubscribers: {},
 
   // =========================================================
   // INVENTORY MOVEMENTS
@@ -375,6 +380,66 @@ export const relations = defineRelations(schema, (r) => ({
     order: r.one.orders({
       from: r.inventoryMovements.orderId,
       to: r.orders.id,
+    }),
+  },
+
+  // =========================================================
+  // DISCOUNTS
+  // =========================================================
+  //
+  // Many-to-many relations use `.through(...)`, so you can query
+  // products / categories / customers directly without touching
+  // the junction tables.
+  // =========================================================
+
+  discounts: {
+    products: r.many.products({
+      from: r.discounts.id.through(r.discountProducts.discountId),
+      to: r.products.id.through(r.discountProducts.productId),
+    }),
+
+    categories: r.many.categories({
+      from: r.discounts.id.through(r.discountCategories.discountId),
+      to: r.categories.id.through(r.discountCategories.categoryId),
+    }),
+
+    customers: r.many.users({
+      from: r.discounts.id.through(r.discountCustomers.discountId),
+      to: r.users.id.through(r.discountCustomers.userId),
+    }),
+
+    usages: r.many.discountUsages({
+      from: r.discounts.id,
+      to: r.discountUsages.discountId,
+    }),
+
+    orders: r.many.orders({
+      from: r.discounts.id,
+      to: r.orders.discountId,
+    }),
+  },
+
+  // =========================================================
+  // DISCOUNT USAGES
+  // =========================================================
+
+  discountUsages: {
+    discount: r.one.discounts({
+      from: r.discountUsages.discountId,
+      to: r.discounts.id,
+      optional: false,
+    }),
+
+    // Optional because userId is nullable (guest checkout later)
+    user: r.one.users({
+      from: r.discountUsages.userId,
+      to: r.users.id,
+    }),
+
+    order: r.one.orders({
+      from: r.discountUsages.orderId,
+      to: r.orders.id,
+      optional: false,
     }),
   },
 }));

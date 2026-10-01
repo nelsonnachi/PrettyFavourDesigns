@@ -82,3 +82,32 @@ select {
   background: #e85d22;
   color: white;
 }
+
+
+
+
+
+
+/* css color */
+.admin-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid #e6ddd1;
+  background: #fffdf9;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: #211b17;
+  outline: none;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.admin-input::placeholder {
+  color: #9b928a;
+}
+
+.admin-input:focus {
+  border-color: #e85d22;
+  box-shadow: 0 0 0 3px rgb(232 93 34 / 10%);
+}

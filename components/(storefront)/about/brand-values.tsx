@@ -29,7 +29,6 @@ export function BrandValues() {
   return (
     <section className="bg-[#f3eee8]">
       <div className="mx-auto max-w-[1440px] px-5 py-20 sm:px-8 sm:py-24 lg:px-12 lg:py-32">
-        {/* HEADER */}
         <div className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
             What we believe
@@ -40,18 +39,17 @@ export function BrandValues() {
           </h2>
 
           <p className="mt-6 text-sm leading-7 text-[#756a60] sm:text-base sm:leading-8">
-            Our values are more than words on a page. They shape the
-            products we choose, the experience we create, and the
-            relationship we build with our customers.
+            Our values are more than words on a page. They shape the products we
+            choose, the experience we create, and the relationship we build with
+            our customers.
           </p>
         </div>
 
-        {/* VALUES */}
         <div className="mt-14 grid border-t border-[#211b17]/10 sm:grid-cols-2 lg:grid-cols-4">
           {values.map((value) => (
             <div
               key={value.number}
-              className="border-b border-[#211b17]/10 px-0 py-8 sm:px-6 sm:first:pl-0 lg:border-b-0 lg:border-r lg:first:pl-0 lg:last:border-r-0"
+              className="border-b border-[#211b17]/10 py-8 sm:px-6 sm:first:pl-0 lg:border-b-0 lg:border-r lg:last:border-r-0"
             >
               <span className="text-xs font-medium text-[#e85d22]">
                 {value.number}

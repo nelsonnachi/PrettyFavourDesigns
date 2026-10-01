@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { AdminLayoutClient } from "@/components/admin/layout/AdminLayoutClient";
 import { requireAdmin } from "@/lib/APIs/auth";
-
 import { ApiError } from "@/lib/APIs/api-errors";
 
 interface AdminLayoutProps {
@@ -13,25 +12,10 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   try {
     await requireAdmin();
   } catch (error) {
-    // ========================================================
-    // NOT AUTHENTICATED
-    // ========================================================
-
-    if (error instanceof ApiError && error.statusCode === 401) {
-      redirect("/sign-in?redirect_url=/admin");
+    if (error instanceof ApiError) {
+      if (error.statusCode === 401) redirect("/sign-in?redirect_url=/admin");
+      if (error.statusCode === 403) redirect("/");
     }
-
-    // ========================================================
-    // AUTHENTICATED BUT NOT ADMIN
-    // ========================================================
-
-    if (error instanceof ApiError && error.statusCode === 403) {
-      redirect("/");
-    }
-
-    // ========================================================
-    // UNEXPECTED ERROR
-    // ========================================================
 
     throw error;
   }

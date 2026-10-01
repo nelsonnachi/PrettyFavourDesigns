@@ -14,6 +14,8 @@ export * from "./addresses";
 
 export * from "./orders";
 
+export * from "./discounts";
+
 export * from "./payments";
 
 export * from "./refunds";

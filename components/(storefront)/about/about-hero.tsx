@@ -1,5 +1,3 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 
@@ -7,7 +5,6 @@ export function AboutHero() {
   return (
     <section className="relative overflow-hidden bg-[#211b17] text-white">
       <div className="mx-auto grid max-w-[1440px] lg:min-h-[680px] lg:grid-cols-2">
-        {/* CONTENT */}
         <div className="flex items-center px-5 py-20 sm:px-8 sm:py-24 lg:px-12 lg:py-28">
           <div className="max-w-xl">
             <p className="mb-5 text-xs font-semibold uppercase tracking-[0.25em] text-[#e85d22]">
@@ -21,9 +18,8 @@ export function AboutHero() {
             </h1>
 
             <p className="mt-7 max-w-lg text-sm leading-7 text-white/70 sm:text-base sm:leading-8">
-              We started with a simple idea: everyday essentials should
-              feel considered, beautiful, and made to become part of
-              your story.
+              We started with a simple idea: everyday essentials should feel
+              considered, beautiful, and made to become part of your story.
             </p>
 
             <Link
@@ -35,7 +31,6 @@ export function AboutHero() {
           </div>
         </div>
 
-        {/* IMAGE */}
         <div className="relative min-h-[480px] lg:min-h-full">
           <Image
             src="/images/banners/about1.png"

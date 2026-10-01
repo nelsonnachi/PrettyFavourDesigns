@@ -6,9 +6,7 @@
 // PAYMENT METHOD
 // ============================================================
 
-export type PaymentMethod =
-  | "paystack"
-  | "cash_on_delivery";
+export type PaymentMethod = "paystack" | "cash_on_delivery";
 
 // ============================================================
 // ORDER STATUS
@@ -44,6 +42,8 @@ export type CheckoutRequest = {
   paymentMethod: PaymentMethod;
 
   notes?: string;
+
+  discountCode?: string;
 };
 
 // ============================================================

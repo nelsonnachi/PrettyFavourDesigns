@@ -4,7 +4,6 @@ export function WhereWeAre() {
   return (
     <section className="border-b border-border">
       <div className="mx-auto grid max-w-[1440px] lg:grid-cols-2">
-        {/* IMAGE */}
         <div className="relative min-h-[480px] lg:min-h-[620px]">
           <Image
             src="/images/products/brownxyz.png"
@@ -15,7 +14,6 @@ export function WhereWeAre() {
           />
         </div>
 
-        {/* CONTENT */}
         <div className="flex items-center px-5 py-20 sm:px-8 sm:py-24 lg:px-12 lg:py-28 xl:px-20">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
@@ -27,17 +25,15 @@ export function WhereWeAre() {
             </h2>
 
             <p className="mt-7 text-sm leading-8 text-[#756a60] sm:text-base">
-              Today, our brand continues to grow from our roots in
-              Nigeria, connecting with customers who appreciate
-              thoughtful products, dependable quality, and effortless
-              style.
+              Today, our brand continues to grow from our roots in Nigeria,
+              connecting with customers who appreciate thoughtful products,
+              dependable quality, and effortless style.
             </p>
 
             <p className="mt-5 text-sm leading-8 text-[#756a60] sm:text-base">
-              We are proud of where we started, but we are even more
-              excited about where we are going. Every customer, every
-              order, and every piece that leaves our hands becomes part
-              of that journey.
+              We are proud of where we started, but we are even more excited
+              about where we are going. Every customer, every order, and every
+              piece that leaves our hands becomes part of that journey.
             </p>
           </div>
         </div>

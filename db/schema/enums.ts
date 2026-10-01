@@ -4,11 +4,14 @@ import { pgEnum } from "drizzle-orm/pg-core";
 // USERS
 // ============================================================
 
-export const userRoleEnum = pgEnum("user_role", [
-  "customer",
-  "admin",
-  "super_admin",
-]);
+export const userRoleEnum = pgEnum(
+  "user_role",
+  [
+    "customer",
+    "admin",
+    "super_admin",
+  ],
+);
 
 // ============================================================
 // PRODUCTS
@@ -87,5 +90,34 @@ export const announcementTypeEnum = pgEnum(
     "sale",
     "event",
     "class",
+  ],
+);
+
+// ============================================================
+// DISCOUNTS
+// ============================================================
+
+export const discountTypeEnum = pgEnum(
+  "discount_type",
+  [
+    "percentage",
+    "fixed",
+  ],
+);
+
+export const discountAppliesToEnum = pgEnum(
+  "discount_applies_to",
+  [
+    "order",
+    "products",
+    "categories",
+  ],
+);
+
+export const discountEligibilityEnum = pgEnum(
+  "discount_eligibility",
+  [
+    "all",
+    "specific_customers",
   ],
 );

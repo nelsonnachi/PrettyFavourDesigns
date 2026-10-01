@@ -20,6 +20,12 @@ type CheckoutSubmitButtonProps = {
   addressId: string;
   paymentMethod: PaymentMethod;
   notes: string;
+
+  // NEW: the code to send. Only set when the code was checked and is valid.
+  discountCode?: string;
+
+  // NEW: true while the discount is being checked
+  isCheckingDiscount: boolean;
 };
 
 function createIdempotencyKey() {
@@ -30,15 +36,14 @@ export function CheckoutSubmitButton({
   addressId,
   paymentMethod,
   notes,
+  discountCode,
+  isCheckingDiscount,
 }: CheckoutSubmitButtonProps) {
-  const createCheckoutMutation =
-    useCreateCheckout();
+  const createCheckoutMutation = useCreateCheckout();
 
-  const initializePaystackMutation =
-    useInitializePaystackPayment();
+  const initializePaystackMutation = useInitializePaystackPayment();
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const isPending =
     createCheckoutMutation.isPending ||
@@ -52,9 +57,7 @@ export function CheckoutSubmitButton({
     // ======================================================
 
     if (!addressId) {
-      setErrorMessage(
-        "Please select a shipping address.",
-      );
+      setErrorMessage("Please select a shipping address.");
 
       return;
     }
@@ -63,36 +66,32 @@ export function CheckoutSubmitButton({
     // IDEMPOTENCY KEY
     // ======================================================
 
-    const idempotencyKey =
-      createIdempotencyKey();
+    const idempotencyKey = createIdempotencyKey();
 
     try {
       // ====================================================
       // CREATE ORDER
       // ====================================================
 
-      const checkoutResponse =
-        await createCheckoutMutation.mutateAsync({
-          idempotencyKey,
+      const checkoutResponse = await createCheckoutMutation.mutateAsync({
+        idempotencyKey,
 
-          addressId,
+        addressId,
 
-          paymentMethod,
+        paymentMethod,
 
-          notes: notes.trim() || undefined,
-        });
+        notes: notes.trim() || undefined,
 
-      const order =
-        checkoutResponse.data.order;
+        discountCode, // NEW
+      });
+
+      const order = checkoutResponse.data.order;
 
       // ====================================================
       // CASH ON DELIVERY
       // ====================================================
 
-      if (
-        paymentMethod ===
-        "cash_on_delivery"
-      ) {
+      if (paymentMethod === "cash_on_delivery") {
         window.location.href = `/checkout/success?order=${encodeURIComponent(
           order.id,
         )}`;
@@ -104,27 +103,21 @@ export function CheckoutSubmitButton({
       // PAYSTACK
       // ====================================================
 
-      const paymentResponse =
-        await initializePaystackMutation.mutateAsync({
-          orderId: order.id,
-        });
+      const paymentResponse = await initializePaystackMutation.mutateAsync({
+        orderId: order.id,
+      });
 
-      const authorizationUrl =
-        paymentResponse.data
-          .authorizationUrl;
+      const authorizationUrl = paymentResponse.data.authorizationUrl;
 
       if (!authorizationUrl) {
-        throw new Error(
-          "Paystack payment could not be initialized.",
-        );
+        throw new Error("Paystack payment could not be initialized.");
       }
 
       // ====================================================
       // REDIRECT TO PAYSTACK
       // ====================================================
 
-      window.location.href =
-        authorizationUrl;
+      window.location.href = authorizationUrl;
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -157,15 +150,14 @@ export function CheckoutSubmitButton({
       <button
         type="button"
         onClick={handleCheckout}
-        disabled={isPending || !addressId}
+        disabled={isPending || !addressId || isCheckingDiscount}
         className="flex h-14 w-full items-center justify-center gap-3 rounded-full bg-accent px-6 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isPending ? (
           <>
             <Loader2 className="h-5 w-5 animate-spin" />
 
-            {paymentMethod ===
-            "paystack"
+            {paymentMethod === "paystack"
               ? "Preparing payment..."
               : "Placing order..."}
           </>
@@ -173,8 +165,7 @@ export function CheckoutSubmitButton({
           <>
             <LockKeyhole className="h-4 w-4" />
 
-            {paymentMethod ===
-            "paystack"
+            {paymentMethod === "paystack"
               ? "Continue to payment"
               : "Place order"}
 
@@ -184,8 +175,7 @@ export function CheckoutSubmitButton({
       </button>
 
       <p className="mt-4 text-center text-xs leading-5 text-muted-foreground">
-        By placing your order, you agree to our terms and
-        conditions.
+        By placing your order, you agree to our terms and conditions.
       </p>
     </div>
   );

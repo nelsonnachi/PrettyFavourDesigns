@@ -1,15 +1,14 @@
+// lib/APIs/payments/release-payment.ts
+
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db/drizzle";
 
-import {
-  payments,
-  orders,
-  orderItems,
-  productVariants,
-} from "@/db/schema";
+import { payments, orders, orderItems, productVariants } from "@/db/schema";
 
 import { ApiError } from "@/lib/APIs/api-errors";
+
+import { releaseDiscountUsage } from "@/lib/APIs/discount"; // NEW
 
 // ============================================================
 // TYPES
@@ -43,10 +42,7 @@ export async function releaseFailedPaymentReservation({
     const payment = paymentResult[0];
 
     if (!payment) {
-      throw new ApiError(
-        "Payment not found",
-        404,
-      );
+      throw new ApiError("Payment not found", 404);
     }
 
     // ========================================================
@@ -65,7 +61,7 @@ export async function releaseFailedPaymentReservation({
       if (!order) {
         throw new ApiError(
           "Order associated with this payment was not found",
-          404,
+          404
         );
       }
 
@@ -83,7 +79,7 @@ export async function releaseFailedPaymentReservation({
     if (payment.status !== "pending") {
       throw new ApiError(
         `Cannot release reservation for payment with status "${payment.status}"`,
-        400,
+        400
       );
     }
 
@@ -100,10 +96,7 @@ export async function releaseFailedPaymentReservation({
     const order = orderResult[0];
 
     if (!order) {
-      throw new ApiError(
-        "Order not found",
-        404,
-      );
+      throw new ApiError("Order not found", 404);
     }
 
     // ========================================================
@@ -116,10 +109,7 @@ export async function releaseFailedPaymentReservation({
       .where(eq(orderItems.orderId, order.id));
 
     if (items.length === 0) {
-      throw new ApiError(
-        "Order has no items",
-        400,
-      );
+      throw new ApiError("Order has no items", 400);
     }
 
     // ========================================================
@@ -130,7 +120,7 @@ export async function releaseFailedPaymentReservation({
       if (!item.variantId) {
         throw new ApiError(
           `No product variant was specified for "${item.productName}"`,
-          400,
+          400
         );
       }
 
@@ -146,26 +136,30 @@ export async function releaseFailedPaymentReservation({
         })
         .where(
           and(
-            eq(
-              productVariants.id,
-              item.variantId,
-            ),
+            eq(productVariants.id, item.variantId),
 
             sql`
               ${productVariants.reservedStock}
               >= ${item.quantity}
-            `,
-          ),
+            `
+          )
         )
         .returning();
 
       if (updatedVariantResult.length === 0) {
         throw new ApiError(
           `Unable to release reserved stock for "${item.productName}"`,
-          409,
+          409
         );
       }
     }
+
+    // ========================================================
+    // 6B. GIVE THE DISCOUNT USE BACK (NEW)
+    // ========================================================
+
+    // Does nothing if this order didn't use a discount
+    await releaseDiscountUsage(tx, order.id);
 
     // ========================================================
     // 7. UPDATE PAYMENT
@@ -181,14 +175,10 @@ export async function releaseFailedPaymentReservation({
       .where(eq(payments.id, payment.id))
       .returning();
 
-    const updatedPayment =
-      paymentUpdateResult[0];
+    const updatedPayment = paymentUpdateResult[0];
 
     if (!updatedPayment) {
-      throw new ApiError(
-        "Failed to update payment",
-        500,
-      );
+      throw new ApiError("Failed to update payment", 500);
     }
 
     // ========================================================
@@ -205,14 +195,10 @@ export async function releaseFailedPaymentReservation({
       .where(eq(orders.id, order.id))
       .returning();
 
-    const updatedOrder =
-      orderUpdateResult[0];
+    const updatedOrder = orderUpdateResult[0];
 
     if (!updatedOrder) {
-      throw new ApiError(
-        "Failed to update order",
-        500,
-      );
+      throw new ApiError("Failed to update order", 500);
     }
 
     // ========================================================

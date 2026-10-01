@@ -9,7 +9,7 @@ const journey = [
     year: "The first collection",
     title: "Finding our identity",
     description:
-      "With a thought saying, 'Why not try making one yourself?. i created my first bad from scratch - and to my surprise it came out beautiful and our identity was born.' ",
+      "With a thought saying, 'Why not try making one yourself?. i created my first bad from scratch - and to my surprise it came out beautiful and our identity was born.'",
   },
   {
     year: "Today",
@@ -30,29 +30,19 @@ export function OurJourney() {
     <section className="border-b border-border">
       <div className="mx-auto max-w-[1440px] px-5 py-20 sm:px-8 sm:py-24 lg:px-12 lg:py-32">
         <div className="grid gap-12 lg:grid-cols-[220px_1fr] lg:gap-16">
-          {/* LABEL */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
-              Our journey
-            </p>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+            Our journey
+          </p>
 
-          {/* TIMELINE */}
           <div className="max-w-4xl">
-            {journey.map((item, index) => (
+            {journey.map((item) => (
               <div
                 key={item.year}
-                className={`grid gap-5 py-8 sm:grid-cols-[150px_1fr] sm:gap-10 ${
-                  index !== 0
-                    ? "border-t border-border"
-                    : "pt-0"
-                }`}
+                className="grid gap-5 border-t border-border py-8 first:border-t-0 first:pt-0 sm:grid-cols-[150px_1fr] sm:gap-10"
               >
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#e85d22]">
-                    {item.year}
-                  </p>
-                </div>
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-[#e85d22]">
+                  {item.year}
+                </p>
 
                 <div>
                   <h3 className="font-serif text-2xl text-[#211b17] sm:text-3xl">

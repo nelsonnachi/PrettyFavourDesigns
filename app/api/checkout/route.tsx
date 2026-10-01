@@ -26,6 +26,12 @@ import { checkoutSchema } from "@/lib/validations/checkout";
 
 import { getOrCreateCart } from "@/lib/APIs/cart";
 
+import {
+  checkDiscount,
+  recordDiscountUsage,
+  type DiscountItem,
+} from "@/lib/APIs/discount";
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -57,6 +63,14 @@ function createPaymentReference(
     .replace(/-/g, "")
     .slice(0, 12)
     .toUpperCase()}`;
+}
+
+// ============================================================
+// MONEY HELPER
+// ============================================================
+
+function round2(amount: number) {
+  return Math.round(amount * 100) / 100;
 }
 
 // ============================================================
@@ -228,6 +242,10 @@ export async function POST(request: Request) {
 
         let subtotal = 0;
 
+        // These are the exact items that the discount engine
+        // will use for the server-side discount calculation.
+        const discountItems: DiscountItem[] = [];
+
         for (const item of cartWithItems.items) {
           // ------------------------------------------------
           // PRODUCT
@@ -323,24 +341,73 @@ export async function POST(request: Request) {
           // ------------------------------------------------
 
           subtotal += price * item.quantity;
+
+          // ------------------------------------------------
+          // DISCOUNT ITEM
+          // ------------------------------------------------
+          //
+          // We use the exact same product/category/price/
+          // quantity information that the discount preview uses.
+          //
+
+          discountItems.push({
+            productId: product.id,
+            categoryId: product.categoryId,
+            price,
+            quantity: item.quantity,
+          });
         }
 
+        subtotal = round2(subtotal);
+
         // ==================================================
-        // 6E. CALCULATE TOTAL
+        // 6E. CALCULATE DISCOUNT ON THE SERVER
+        // ==================================================
+        //
+        // IMPORTANT:
+        //
+        // We NEVER trust the discount amount from the frontend.
+        //
+        // The frontend only sends:
+        //
+        //     discountCode: "SAVE10"
+        //
+        // The server checks the actual discount again using
+        // the actual cart contents.
+        //
+
+        let discountAmount = 0;
+
+        let discountId: string | null = null;
+
+        if (data.discountCode) {
+          const discountResult = await checkDiscount(tx, {
+            code: data.discountCode,
+            userId: user.id,
+            items: discountItems,
+          });
+
+          discountAmount = discountResult.discountAmount;
+
+          discountId = discountResult.discount.id;
+        }
+
+        discountAmount = round2(discountAmount);
+
+        // ==================================================
+        // 6F. CALCULATE FINAL TOTAL
         // ==================================================
 
         const shippingFee = 0;
 
-        const discount = 0;
-
-        const total = subtotal + shippingFee - discount;
+        const total = round2(subtotal + shippingFee - discountAmount);
 
         if (!Number.isFinite(total) || total <= 0) {
           throw new ApiError("Invalid checkout total", 400);
         }
 
         // ==================================================
-        // 6F. CREATE IDENTIFIERS
+        // 6G. CREATE IDENTIFIERS
         // ==================================================
 
         const orderNumber = createOrderNumber();
@@ -351,7 +418,7 @@ export async function POST(request: Request) {
         );
 
         // ==================================================
-        // 6G. CREATE ORDER
+        // 6H. CREATE ORDER
         // ==================================================
 
         const orderResult = await tx
@@ -373,8 +440,10 @@ export async function POST(request: Request) {
 
             shippingFee: shippingFee.toFixed(2),
 
-            discount: discount.toFixed(2),
+            // THIS IS NOW THE REAL SERVER-CALCULATED DISCOUNT
+            discount: discountAmount.toFixed(2),
 
+            // THIS IS THE DISCOUNTED TOTAL
             total: total.toFixed(2),
 
             notes: data.notes ?? null,
@@ -392,8 +461,15 @@ export async function POST(request: Request) {
         }
 
         // ==================================================
-        // 6H. CREATE PAYMENT
+        // 6I. CREATE PAYMENT
         // ==================================================
+        //
+        // IMPORTANT:
+        //
+        // payment.amount is the FINAL DISCOUNTED TOTAL.
+        //
+        // Paystack/payment processing must use this amount.
+        //
 
         const paymentResult = await tx
           .insert(payments)
@@ -407,6 +483,7 @@ export async function POST(request: Request) {
 
             reference: paymentReference,
 
+            // FINAL DISCOUNTED AMOUNT
             amount: total.toFixed(2),
 
             currency: "NGN",
@@ -426,7 +503,29 @@ export async function POST(request: Request) {
         }
 
         // ==================================================
-        // 6I. CREATE SHIPPING SNAPSHOT
+        // 6J. RECORD DISCOUNT USAGE
+        // ==================================================
+        //
+        // This happens inside the SAME transaction.
+        //
+        // If recording the usage fails, the order and payment
+        // are rolled back too.
+        //
+
+        if (discountId) {
+          await recordDiscountUsage(tx, {
+            discountId,
+
+            userId: user.id,
+
+            orderId: createdOrder.id,
+
+            discountAmount,
+          });
+        }
+
+        // ==================================================
+        // 6K. CREATE SHIPPING SNAPSHOT
         // ==================================================
 
         await tx.insert(orderShippingAddresses).values({
@@ -454,7 +553,7 @@ export async function POST(request: Request) {
         });
 
         // ==================================================
-        // 6J. CREATE ORDER ITEMS + RESERVE STOCK
+        // 6L. CREATE ORDER ITEMS + RESERVE STOCK
         // ==================================================
 
         for (const item of cartWithItems.items) {
@@ -506,8 +605,10 @@ export async function POST(request: Request) {
 
             quantity,
 
+            // Original product price
             unitPrice: price.toFixed(2),
 
+            // Original item total
             totalPrice: itemTotal.toFixed(2),
 
             createdAt: now,
@@ -521,9 +622,9 @@ export async function POST(request: Request) {
             .update(productVariants)
             .set({
               reservedStock: sql`
-                    ${productVariants.reservedStock}
-                    + ${quantity}
-                  `,
+                ${productVariants.reservedStock}
+                + ${quantity}
+              `,
 
               updatedAt: now,
             })
@@ -532,11 +633,11 @@ export async function POST(request: Request) {
                 eq(productVariants.id, variant.id),
 
                 sql`
-                    ${productVariants.stock}
-                    -
-                    ${productVariants.reservedStock}
-                    >= ${quantity}
-                  `,
+                  ${productVariants.stock}
+                  -
+                  ${productVariants.reservedStock}
+                  >= ${quantity}
+                `,
               ),
             )
             .returning();
@@ -550,19 +651,27 @@ export async function POST(request: Request) {
         }
 
         // ==================================================
-        // 6K. CLEAR CART
+        // 6M. CLEAR CART
         // ==================================================
 
         await tx.delete(cartItems).where(eq(cartItems.cartId, lockedCart.id));
 
         // ==================================================
-        // 6L. RETURN CREATED RECORDS
+        // 6N. RETURN CREATED RECORDS
         // ==================================================
 
         return {
           order: createdOrder,
 
           payment: createdPayment,
+
+          discount: {
+            id: discountId,
+
+            code: data.discountCode ?? null,
+
+            amount: discountAmount,
+          },
         };
       });
 
@@ -584,12 +693,15 @@ export async function POST(request: Request) {
 
               reference: checkoutResult.payment.reference,
 
+              // FINAL DISCOUNTED PAYMENT AMOUNT
               amount: checkoutResult.payment.amount,
 
               currency: checkoutResult.payment.currency,
 
               status: checkoutResult.payment.status,
             },
+
+            discount: checkoutResult.discount,
 
             alreadyCreated: false,
           },

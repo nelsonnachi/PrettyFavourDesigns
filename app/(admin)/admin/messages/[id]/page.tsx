@@ -1,14 +1,10 @@
 import { MessageDetails } from "@/components/admin/messages/MessageDetails";
 
-interface AdminMessageDetailsPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
-
 export default async function AdminMessageDetailsPage({
   params,
-}: AdminMessageDetailsPageProps) {
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
 
   return <MessageDetails messageId={id} />;
